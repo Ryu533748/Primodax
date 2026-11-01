@@ -4,8 +4,7 @@
 -- ██╔═══╝ ██╔══██╗██║██║╚██╔╝██║██║   ██║██║  ██║██╔══██║ ██╔██╗
 -- ██║     ██║  ██║██║██║ ╚═╝ ██║╚██████╔╝██████╔╝██║  ██║██╔╝ ██╗
 -- ╚═╝     ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
--- PRIMODAX VGRANT v6.5 | CREATED BY: BOBOYTAGAAQUARIUS
--- FIXED: Crossbow Reload, Mobile Inf Jump, Auto Sprint, Wide Screen FOV
+-- PRIMODAX VGRANT v6.6 | ANTI-KICK FIX | FORCE RELOAD
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -16,7 +15,6 @@ local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
 local VirtualUser = game:GetService("VirtualUser")
 local TeleportService = game:GetService("TeleportService")
-local Lighting = game:GetService("Lighting")
 
 local LP = Players.LocalPlayer
 local Cam = Workspace.CurrentCamera
@@ -25,7 +23,7 @@ local Cam = Workspace.CurrentCamera
 local CFG = {
     SilentAim = false, Aimbot = false, AimbotSmoothing = 15, FOVRange = 120,
     SkipFriends = true, AutoRespawn = false, RespawnToBag = false,
-    InfiniteJump = false, Noclip = false, AutoSprint = false, SprintSpeed = 30,
+    InfiniteJump = false, AutoSprint = false, SprintSpeed = 20, -- MAX 20 to 22 lang para di ma-kick
     ESPEnabled = false, AutoPickup = false, PickupPriority = "Random", 
     AntiKick = true, UnlimitedAmmo = false, AutoReload = false,
     WideScreen = false, CameraFOV = 70,
@@ -43,7 +41,7 @@ local function updateCameraFOV()
     if CFG.WideScreen then
         Cam.FieldOfView = CFG.CameraFOV
     else
-        Cam.FieldOfView = 70 -- Default Roblox FOV
+        Cam.FieldOfView = 70
     end
 end
 
@@ -163,61 +161,62 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ============ CROSSBOW & GUN RELOAD FIX ============
+-- ============ FORCE RELOAD & INFINITE AMMO ============
+-- Ang Crossbow ay may "Draw Time". Para ma-force reload, i-unequip at i-equip natin nang mabilis.
+local lastReloadTime = 0
 RunService.Heartbeat:Connect(function()
     if not CFG.UnlimitedAmmo and not CFG.AutoReload then return end
     local char = getChar(LP)
     if not char then return end
     local tool = char:FindFirstChildOfClass("Tool")
     if not tool then return end
+    local hum = getHum(LP)
+    if not hum then return end
 
-    -- Check for Cooldown/Reload state attributes (Crossbow logic)
-    local reloading = tool:GetAttribute("Reloading") or tool:GetAttribute("IsReloading")
-    local ammoAttr = tool:GetAttribute("Ammo") or tool:GetAttribute("CurrentAmmo") or tool:GetAttribute("StoredAmmo")
-
-    if CFG.AutoReload and reloading == true then
-        tool:SetAttribute("Reloading", false)
-    end
-
-    if CFG.UnlimitedAmmo and ammoAttr and type(ammoAttr) == "number" then
-        if ammoAttr < 5 then tool:SetAttribute("Ammo", 999) end
-    end
-
-    -- Fallback for Value objects
-    for _, v in ipairs(tool:GetDescendants()) do
-        local n = v.Name:lower()
-        if v:IsA("IntValue") or v:IsA("NumberValue") then
-            if CFG.UnlimitedAmmo and (n:find("ammo") or n:find("bullet") or n:find("mag") or n:find("bolt")) then
-                if v.Value < 5 then v.Value = 999 end
-            end
-            if CFG.AutoReload and (n:find("reload") or n:find("reloading")) then
-                if v.Value == 1 then v.Value = 0 end
-            end
+    -- Force Auto Reload (Crossbow Fix)
+    if CFG.AutoReload and tick() - lastReloadTime > 1.5 then
+        local isReloading = tool:GetAttribute("Reloading") or tool:GetAttribute("IsReloading")
+        local ammo = tool:GetAttribute("Ammo") or tool:GetAttribute("CurrentAmmo") or tool:GetAttribute("StoredAmmo")
+        
+        -- Kung kulang sa bala o nagre-reload state, pilitin i-refresh
+        if isReloading == true or (ammo and ammo == 0) then
+            hum:UnequipTools()
+            task.wait(0.1)
+            hum:EquipTool(tool)
+            lastReloadTime = tick()
         end
-        if v:IsA("BoolValue") and CFG.AutoReload and (n:find("reload") or n:find("reloading")) then
-            v.Value = false
+    end
+
+    -- Infinite Ammo (Fallback sa Values)
+    if CFG.UnlimitedAmmo then
+        for _, v in ipairs(tool:GetDescendants()) do
+            local n = v.Name:lower()
+            if v:IsA("IntValue") or v:IsA("NumberValue") then
+                if n:find("ammo") or n:find("bullet") or n:find("mag") or n:find("bolt") then
+                    if v.Value < 5 then v.Value = 999 end
+                end
+            end
         end
     end
 end)
 
--- ============ MOVEMENT (INF JUMP & SPRINT & NOCLIP) ============
+-- ============ MOVEMENT (INF JUMP & SPRINT) ============
 RunService.Heartbeat:Connect(function()
     local char = getChar(LP)
     if not char then return end
     local hum = getHum(LP)
-    local root = getRoot(LP)
-    if not hum or not root then return end
+    if not hum then return end
 
-    -- Auto Sprint
+    -- Auto Sprint (Safe Speed 20-22)
     if CFG.AutoSprint then
         if hum.WalkSpeed < CFG.SprintSpeed then
             hum.WalkSpeed = CFG.SprintSpeed
         end
     elseif hum.WalkSpeed == CFG.SprintSpeed then
-        hum.WalkSpeed = 16 -- Reset to default if turned off
+        hum.WalkSpeed = 16 -- Reset sa default
     end
 
-    -- Infinite Jump (Mobile Safe)
+    -- Infinite Jump
     if CFG.InfiniteJump then
         local jumpHeld = UserInputService:IsKeyDown(Enum.KeyCode.Space) or 
                          UserInputService:IsKeyDown(Enum.KeyCode.ButtonA) or 
@@ -226,13 +225,6 @@ RunService.Heartbeat:Connect(function()
             if hum:GetState() ~= Enum.HumanoidStateType.Jumping and hum:GetState() ~= Enum.HumanoidStateType.Freefall then
                 hum:ChangeState(Enum.HumanoidStateType.Jumping)
             end
-        end
-    end
-
-    -- Noclip
-    if CFG.Noclip then
-        for _, v in ipairs(char:GetDescendants()) do
-            if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then v.CanCollide = false end
         end
     end
 end)
@@ -398,13 +390,12 @@ makeToggle("Skip Friends", "SkipFriends", 6)
 
 makeSection("WEAPONS", 10)
 makeToggle("Unlimited Ammo", "UnlimitedAmmo", 11)
-makeToggle("Auto Reload (Crossbow Fix)", "AutoReload", 12)
+makeToggle("Force Reload (Crossbow)", "AutoReload", 12)
 
 makeSection("MOVEMENT", 20)
 makeToggle("Infinite Jump", "InfiniteJump", 21)
-makeToggle("Auto Sprint", "AutoSprint", 22)
-makeSlider("Sprint Speed", "SprintSpeed", 16, 100, 23)
-makeToggle("Noclip", "Noclip", 24)
+makeToggle("Auto Sprint (Safe)", "AutoSprint", 22)
+makeSlider("Sprint Speed (Max 22)", "SprintSpeed", 16, 22, 23)
 
 makeSection("VISUAL & CAMERA", 30)
 makeToggle("ESP", "ESPEnabled", 31)
@@ -434,4 +425,4 @@ toggleBtn.InputBegan:Connect(function(input) if input.UserInputType == Enum.User
 UserInputService.InputChanged:Connect(function(input) if drag and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then local delta = input.Position - dragStart; toggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
 UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then drag = false; if startPos and math.abs(input.Position.X - dragStart.X) < 10 and math.abs(input.Position.Y - dragStart.Y) < 10 then MF.Visible = not MF.Visible end end end)
 
-print("✅ PRIMODAX v6.5 Loaded — Created by BoboyTagaAquarius")
+print("✅ PRIMODAX v6.6 Loaded — Safe Speed, Force Reload Activated")
