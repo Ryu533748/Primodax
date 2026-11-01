@@ -635,83 +635,16 @@ SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 SG.IgnoreGuiInset = true
 SG.Parent         = CoreGui
 
--- responsive panel size
-local vp          = Cam.ViewportSize
-local isWide      = vp.X > 700   -- iPad / landscape
-local PANEL_W     = isWide and 380 or 270
-local PANEL_H     = isWide and 600 or 530
-local BASE_FONT   = isWide and 14  or 12
-local TITLE_FONT  = isWide and 16  or 14
-local BTN_H       = isWide and 38  or 32
+-- responsive sizing
+local vp     = Cam.ViewportSize
+local isWide = vp.X > 700
+local PANEL_W   = isWide and 380 or 270
+local PANEL_H   = isWide and 600 or 530
+local BASE_FONT = isWide and 14  or 12
+local TITLE_FONT= isWide and 16  or 14
+local BTN_H     = isWide and 38  or 32
 
--- update on viewport change (rotation)
-Cam:GetPropertyChangedSignal("ViewportSize"):Connect(function()
-    vp       = Cam.ViewportSize
-    isWide   = vp.X > 700
-    PANEL_W  = isWide and 380 or 270
-    PANEL_H  = isWide and 600 or 530
-    MF.Size  = UDim2.new(0, PANEL_W, 0, PANEL_H)
-end)
-
--- ──────────────────────────────────────────────────────
---  FLOATING CIRCLE TOGGLE BUTTON
--- ──────────────────────────────────────────────────────
-local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size             = UDim2.new(0, 60, 0, 60)
-toggleBtn.Position         = UDim2.new(0.5, -30, 1, -95)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
-toggleBtn.TextColor3       = Color3.fromRGB(0, 0, 0)
-toggleBtn.Text             = "⚡"
-toggleBtn.TextSize         = 24
-toggleBtn.Font             = Enum.Font.GothamBold
-toggleBtn.ZIndex           = 10
-toggleBtn.Active           = true
-toggleBtn.Parent           = SG
-Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
-
--- drop shadow on toggle btn
-local tShadow = Instance.new("UIStroke")
-tShadow.Color     = Color3.fromRGB(0,0,0)
-tShadow.Thickness = 2
-tShadow.Parent    = toggleBtn
-
--- draggable toggle button
-do
-    local drag, dragStart, startPos = false, nil, nil
-    local moved = false
-    toggleBtn.InputBegan:Connect(function(inp)
-        if inp.UserInputType==Enum.UserInputType.Touch
-        or inp.UserInputType==Enum.UserInputType.MouseButton1 then
-            drag=true moved=false
-            dragStart=inp.Position startPos=toggleBtn.Position
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(inp)
-        if drag and (inp.UserInputType==Enum.UserInputType.Touch
-        or inp.UserInputType==Enum.UserInputType.MouseMovement) then
-            local delta = inp.Position - dragStart
-            if delta.Magnitude > 5 then moved=true end
-            toggleBtn.Position = UDim2.new(
-                startPos.X.Scale, startPos.X.Offset+delta.X,
-                startPos.Y.Scale, startPos.Y.Offset+delta.Y
-            )
-        end
-    end)
-    UserInputService.InputEnded:Connect(function(inp)
-        if inp.UserInputType==Enum.UserInputType.Touch
-        or inp.UserInputType==Enum.UserInputType.MouseButton1 then
-            drag=false
-            -- only toggle if it was a tap, not a drag
-            if not moved then
-                MF.Visible = not MF.Visible
-            end
-        end
-    end)
-end
-
--- ──────────────────────────────────────────────────────
---  MAIN PANEL
--- ──────────────────────────────────────────────────────
+-- ── MAIN PANEL (declared FIRST so toggle can reference it) ──
 local MF = Instance.new("Frame")
 MF.Size             = UDim2.new(0, PANEL_W, 0, PANEL_H)
 MF.Position         = UDim2.new(0.5, -PANEL_W/2, 0.5, -PANEL_H/2)
@@ -727,9 +660,18 @@ Instance.new("UICorner", MF).CornerRadius = UDim.new(0, 12)
 local mfStroke = Instance.new("UIStroke")
 mfStroke.Color=Color3.fromRGB(255,215,0) mfStroke.Thickness=1.5 mfStroke.Parent=MF
 
--- BACKGROUND IMAGE (behind everything, ZIndex=1)
--- Background: kommodo.ai live photo
-local BG_URL = "https://kommodo.ai/i/rEJQGF9mw7x6XTpPJChr"  -- live photo bg
+-- viewport rotation handler
+Cam:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+    vp       = Cam.ViewportSize
+    isWide   = vp.X > 700
+    PANEL_W  = isWide and 380 or 270
+    PANEL_H  = isWide and 600 or 530
+    MF.Size  = UDim2.new(0, PANEL_W, 0, PANEL_H)
+end)
+
+-- BACKGROUND IMAGE
+-- FILL: swap with your direct image URL (.png/.jpg) or rbxassetid://NUMBER
+local BG_URL = "https://kommodo.ai/i/rEJQGF9mw7x6XTpPJChr"
 local bgImg = Instance.new("ImageLabel")
 bgImg.Size               = UDim2.new(1,0,1,0)
 bgImg.Position           = UDim2.new(0,0,0,0)
@@ -786,106 +728,52 @@ local Pad=Instance.new("UIPadding")
 Pad.PaddingTop=UDim.new(0,5) Pad.PaddingLeft=UDim.new(0,5)
 Pad.PaddingRight=UDim.new(0,5) Pad.Parent=SF
 
--- ──────────────────────────────────────────────────────
---  UI ELEMENT BUILDERS
--- ──────────────────────────────────────────────────────
-local toggleRefs = {}
+-- ── FLOATING CIRCLE TOGGLE (declared AFTER MF so it can reference it) ──
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size             = UDim2.new(0, 60, 0, 60)
+toggleBtn.Position         = UDim2.new(0.5, -30, 1, -95)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+toggleBtn.TextColor3       = Color3.fromRGB(0, 0, 0)
+toggleBtn.Text             = "⚡"
+toggleBtn.TextSize         = 24
+toggleBtn.Font             = Enum.Font.GothamBold
+toggleBtn.ZIndex           = 10
+toggleBtn.Active           = true
+toggleBtn.Parent           = SG
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
 
-local function makeSection(text, order)
-    local lbl=Instance.new("TextLabel")
-    lbl.Size=UDim2.new(1,0,0,20) lbl.BackgroundColor3=Color3.fromRGB(30,30,30)
-    lbl.Text=text lbl.TextColor3=Color3.fromRGB(255,215,0)
-    lbl.TextSize=11 lbl.Font=Enum.Font.GothamBold
-    lbl.LayoutOrder=order lbl.ZIndex=6 lbl.Parent=SF
-    Instance.new("UICorner",lbl).CornerRadius=UDim.new(0,4)
-end
+local tShadow = Instance.new("UIStroke")
+tShadow.Color=Color3.fromRGB(0,0,0) tShadow.Thickness=2 tShadow.Parent=toggleBtn
 
-local function makeToggle(label, key, order, onToggle)
-    local btn=Instance.new("TextButton")
-    btn.Size=UDim2.new(1,0,0,BTN_H)
-    btn.BackgroundColor3=CFG[key] and Color3.fromRGB(255,215,0) or Color3.fromRGB(35,35,35)
-    btn.Text=label..": "..(CFG[key] and "ON" or "OFF")
-    btn.TextColor3=CFG[key] and Color3.fromRGB(0,0,0) or Color3.fromRGB(200,200,200)
-    btn.TextSize=BASE_FONT btn.Font=Enum.Font.GothamBold
-    btn.LayoutOrder=order btn.ZIndex=6 btn.Parent=SF
-    Instance.new("UICorner",btn).CornerRadius=UDim.new(0,6)
-    local s=Instance.new("UIStroke")
-    s.Color=Color3.fromRGB(255,215,0) s.Thickness=0.5 s.Parent=btn
-
-    local function refresh()
-        btn.BackgroundColor3=CFG[key] and Color3.fromRGB(255,215,0) or Color3.fromRGB(35,35,35)
-        btn.TextColor3=CFG[key] and Color3.fromRGB(0,0,0) or Color3.fromRGB(200,200,200)
-        btn.Text=label..": "..(CFG[key] and "ON" or "OFF")
-    end
-    toggleRefs[key]=refresh
-
-    btn.MouseButton1Click:Connect(function()
-        CFG[key]=not CFG[key]
-        refresh()
-        if onToggle then onToggle(CFG[key]) end
-    end)
-end
-
-local function makeSlider(label, key, minVal, maxVal, order)
-    local container=Instance.new("Frame")
-    container.Size=UDim2.new(1,0,0,54)
-    container.BackgroundColor3=Color3.fromRGB(22,22,22)
-    container.LayoutOrder=order container.ZIndex=6 container.Parent=SF
-    Instance.new("UICorner",container).CornerRadius=UDim.new(0,6)
-
-    local lbl=Instance.new("TextLabel")
-    lbl.Size=UDim2.new(1,-10,0,20) lbl.Position=UDim2.new(0,8,0,4)
-    lbl.BackgroundTransparency=1
-    lbl.Text=label..": "..tostring(CFG[key])
-    lbl.TextColor3=Color3.fromRGB(255,215,0) lbl.TextSize=11
-    lbl.Font=Enum.Font.Gotham lbl.TextXAlignment=Enum.TextXAlignment.Left
-    lbl.ZIndex=7 lbl.Parent=container
-
-    local track=Instance.new("Frame")
-    track.Size=UDim2.new(1,-16,0,8) track.Position=UDim2.new(0,8,0,36)
-    track.BackgroundColor3=Color3.fromRGB(50,50,50) track.ZIndex=7 track.Parent=container
-    Instance.new("UICorner",track).CornerRadius=UDim.new(1,0)
-
-    local frac0=(CFG[key]-minVal)/(maxVal-minVal)
-    local fill=Instance.new("Frame")
-    fill.Size=UDim2.new(frac0,0,1,0) fill.BackgroundColor3=Color3.fromRGB(255,215,0)
-    fill.ZIndex=8 fill.Parent=track
-    Instance.new("UICorner",fill).CornerRadius=UDim.new(1,0)
-
-    local knob=Instance.new("TextButton")
-    knob.Size=UDim2.new(0,18,0,18) knob.AnchorPoint=Vector2.new(0.5,0.5)
-    knob.Position=UDim2.new(frac0,0,0.5,0) knob.BackgroundColor3=Color3.fromRGB(255,255,255)
-    knob.Text="" knob.ZIndex=9 knob.Parent=track
-    Instance.new("UICorner",knob).CornerRadius=UDim.new(1,0)
-
-    local sliding=false
-    local function updateSlider(pos)
-        local ap=track.AbsolutePosition local as=track.AbsoluteSize
-        local frac=math.clamp((pos.X-ap.X)/as.X,0,1)
-        local value=math.floor(minVal+frac*(maxVal-minVal)+0.5)
-        CFG[key]=value
-        fill.Size=UDim2.new(frac,0,1,0) knob.Position=UDim2.new(frac,0,0.5,0)
-        lbl.Text=label..": "..tostring(value)
-    end
-    knob.InputBegan:Connect(function(inp)
-        if inp.UserInputType==Enum.UserInputType.Touch
-        or inp.UserInputType==Enum.UserInputType.MouseButton1 then sliding=true end
-    end)
-    track.InputBegan:Connect(function(inp)
+-- draggable + tap to toggle (MF now exists above, no nil reference)
+do
+    local drag, dragStart, startPos, moved = false, nil, nil, false
+    toggleBtn.InputBegan:Connect(function(inp)
         if inp.UserInputType==Enum.UserInputType.Touch
         or inp.UserInputType==Enum.UserInputType.MouseButton1 then
-            sliding=true updateSlider(inp.Position)
+            drag=true moved=false
+            dragStart=inp.Position startPos=toggleBtn.Position
         end
     end)
     UserInputService.InputChanged:Connect(function(inp)
-        if sliding and (inp.UserInputType==Enum.UserInputType.Touch
+        if drag and (inp.UserInputType==Enum.UserInputType.Touch
         or inp.UserInputType==Enum.UserInputType.MouseMovement) then
-            updateSlider(inp.Position)
+            local delta = inp.Position - dragStart
+            if delta.Magnitude > 6 then moved=true end
+            toggleBtn.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset+delta.X,
+                startPos.Y.Scale, startPos.Y.Offset+delta.Y
+            )
         end
     end)
     UserInputService.InputEnded:Connect(function(inp)
         if inp.UserInputType==Enum.UserInputType.Touch
-        or inp.UserInputType==Enum.UserInputType.MouseButton1 then sliding=false end
+        or inp.UserInputType==Enum.UserInputType.MouseButton1 then
+            drag=false
+            if not moved then
+                MF.Visible = not MF.Visible  -- MF exists here, no nil
+            end
+        end
     end)
 end
 
