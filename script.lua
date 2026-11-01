@@ -4,8 +4,7 @@
 -- ██╔═══╝ ██╔══██╗██║██║╚██╔╝██║██║   ██║██║  ██║██╔══██║ ██╔██╗
 -- ██║     ██║  ██║██║██║ ╚═╝ ██║╚██████╔╝██████╔╝██║  ██║██╔╝ ██╗
 -- ╚═╝     ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
--- PRIMODAX VGRANT | Vagrant Survival | v6.1 FIXED
--- FIXED: Gun Firing, ESP (Box+Name+Dist), Infinite Jump, Aimbot Settings
+-- PRIMODAX VGRANT v6.2 | Silent Aim FIXED | Auto Bag Respawn | Pickup Filter
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -25,15 +24,17 @@ local CFG = {
     -- Combat
     SilentAim = false,
     Aimbot = false,
-    AimbotSmoothing = 15, -- 0-100 (0 = Snap, 100 = Smooth)
-    FOVRange = 120,       -- 0-360
+    AimbotSmoothing = 15, 
+    FOVRange = 120,
     AutoShoot = false,
     SkipFriends = true,
     -- Utility
     UnlimitedAmmo = false,
     AutoReload = false,
     AutoPickup = false,
+    PickupPriority = "Random", -- "Random", "Guns", "Heals", "Ammo"
     AutoRespawn = false,
+    RespawnToBag = false,
     -- Movement
     InfiniteJump = false,
     Noclip = false,
@@ -53,7 +54,7 @@ local function getRoot(p) local c = getChar(p) return c and c:FindFirstChild("Hu
 local function getPart(p, n) local c = getChar(p) return c and c:FindFirstChild(n) end
 local function isAlive(p) local h = getHum(p) return h and h.Health > 0 end
 
--- ============ DRAWING FOV CIRCLE ============
+-- ============ DRAWING FOV ============
 local fovCircle = Drawing.new("Circle")
 fovCircle.Thickness = 1.5
 fovCircle.Color = Color3.fromRGB(255, 215, 0)
@@ -92,38 +93,209 @@ local function getTargetInFOV()
     return bestTarget
 end
 
--- ============ SILENT AIM + ANTIKICK HOOK ============
--- Gagamit tayo ng __index hook para hindi maapektuhan ang baril.
-local oldIndex
-oldIndex = hookmetamethod(game, "__index", function(self, key)
-    if key == "WalkSpeed" and CFG.AutoSprint then
-        return CFG.SprintSpeed
+-- ============ SILENT AIM (MAGNETIC REDIRECT) ============
+-- Ito ang inayos natin. Kinakain niya yung arguments ng baril (Vector3, CFrame, Instance)
+-- at pinapalitan ng position/part ng kalaban. Kahit nakatalikod, tatama.
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = { ... }
+    
+    if method == "FireServer" or method == "InvokeServer" then
+        -- Anti-Kick logic
+        if CFG.AntiKick then
+            local n = (self.Name or ""):lower()
+            if n:find("kick") or n:find("ban") or n:find("cheat") or n:find("detect") then
+                return nil
+            end
+        end
+
+        -- Silent Aim logic
+        if CFG.SilentAim and activeTarget and isAlive(activeTarget) then
+            local targetChar = getChar(activeTarget)
+            local targetHead = targetChar and targetChar:FindFirstChild("Head")
+            
+            if targetHead then
+                for i, v in ipairs(args) do
+                    -- 1. Palitan ang Vector3 (posisyon)
+                    if typeof(v) == "Vector3" then
+                        args[i] = targetHead.Position
+                    
+                    -- 2. Palitan ang CFrame (direksyon / lookvector)
+                    elseif typeof(v) == "CFrame" then
+                        local lookDir = (targetHead.Position - Cam.CFrame.Position).Unit
+                        args[i] = CFrame.new(Cam.CFrame.Position, Cam.CFrame.Position + lookDir)
+                    
+                    -- 3. Palitan ang Instance (kung Character o Part ang pinapasa)
+                    elseif typeof(v) == "Instance" then
+                        if v:IsA("BasePart") then
+                            args[i] = targetHead
+                        elseif v:IsA("Model") then
+                            args[i] = targetChar
+                        end
+                    
+                    -- 4. Handle Tables (RaycastParams, etc.)
+                    elseif typeof(v) == "table" then
+                        for k, val in pairs(v) do
+                            if typeof(val) == "Vector3" then
+                                v[k] = targetHead.Position
+                            elseif typeof(val) == "CFrame" then
+                                local lookDir = (targetHead.Position - Cam.CFrame.Position).Unit
+                                v[k] = CFrame.new(Cam.CFrame.Position, Cam.CFrame.Position + lookDir)
+                            end
+                        end
+                    end
+                end
+            end
+        end
     end
-    return oldIndex(self, key)
+    return oldNamecall(self, table.unpack(args))
 end)
 
--- ============ AIMBOT CAMERA ============
+-- ============ AIMBOT (CAMERA) ============
 RunService.RenderStepped:Connect(function()
-    local target = getTargetInFOV()
+    activeTarget = getTargetInFOV()
     
-    if target then
-        local head = getPart(target, "Head")
-        if head then
-            -- Silent Aim (pwede ring gawin sa __index pero mas safe dito kung Visual lang)
-            -- Aimbot (Camera Lerp)
-            if CFG.Aimbot then
-                local targetPos = head.Position
-                local currentCF = Cam.CFrame
-                local targetCF = CFrame.new(currentCF.Position, targetPos)
-                -- 0 to 100 mapping (0 = Snap, 100 = Slow)
-                local smoothFactor = math.clamp(1 - (CFG.AimbotSmoothing / 100), 0.01, 1)
-                Cam.CFrame = currentCF:Lerp(targetCF, smoothFactor * 0.3)
+    if activeTarget then
+        local head = getPart(activeTarget, "Head")
+        if head and CFG.Aimbot then
+            local targetPos = head.Position
+            local currentCF = Cam.CFrame
+            local targetCF = CFrame.new(currentCF.Position, targetPos)
+            
+            -- Smoothing 0 = Snap, 100 = Masyadong mabagal
+            local smoothFactor = math.clamp(1 - (CFG.AimbotSmoothing / 100), 0.05, 1)
+            Cam.CFrame = currentCF:Lerp(targetCF, smoothFactor)
+        end
+    end
+end)
+
+-- ============ AUTO PICKUP (PRIORITY FILTER) ============
+RunService.Heartbeat:Connect(function()
+    if not CFG.AutoPickup then return end
+    local char = getChar(LP)
+    local root = getRoot(LP)
+    if not char or not root then return end
+
+    local closestObj, minDist = nil, 50
+    
+    -- Mag-scan sa buong Workspace
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") or obj:IsA("BasePart") then
+            local part = obj:IsA("BasePart") and obj or obj:FindFirstChildOfClass("BasePart")
+            if part then
+                local d = (root.Position - part.Position).Magnitude
+                if d < minDist then
+                    -- Priority Filter
+                    local name = obj.Name:lower()
+                    local isPriority = false
+                    
+                    if CFG.PickupPriority == "Random" then
+                        isPriority = true
+                    elseif CFG.PickupPriority == "Guns" then
+                        if name:find("gun") or name:find("rifle") or name:find("pistol") or name:find("weapon") then isPriority = true end
+                    elseif CFG.PickupPriority == "Heals" then
+                        if name:find("med") or name:find("heal") or name:find("bandage") or name:find("kit") then isPriority = true end
+                    elseif CFG.PickupPriority == "Ammo" then
+                        if name:find("ammo") or name:find("bullet") or name:find("mag") then isPriority = true end
+                    end
+
+                    -- Kung priority, i-set as target
+                    if isPriority then
+                        closestObj = obj
+                        minDist = d
+                    end
+                end
+            end
+        end
+    end
+
+    -- Kunin ang item
+    if closestObj then
+        -- 1. ProximityPrompt
+        for _, v in ipairs(closestObj:GetDescendants()) do
+            if v:IsA("ProximityPrompt") then
+                pcall(fireproximityprompt, v)
+            end
+        end
+        -- 2. ClickDetector
+        for _, v in ipairs(closestObj:GetDescendants()) do
+            if v:IsA("ClickDetector") then
+                pcall(fireclickdetector, v)
+            end
+        end
+        -- 3. RemoteEvent (kung may specific na remote)
+        for _, v in ipairs(closestObj:GetDescendants()) do
+            if v:IsA("RemoteEvent") then
+                local n = v.Name:lower()
+                if n:find("pick") or n:find("loot") or n:find("take") then
+                    pcall(function() v:FireServer(closestObj) end)
+                end
             end
         end
     end
 end)
 
--- ============ ESP (BOX + NAME + DISTANCE) ============
+-- ============ AUTO RESPAWN (BAG / OWN LOOT) ============
+local function findOwnBag()
+    local root = getRoot(LP)
+    if not root then return nil end
+    local closestBag, minDist = nil, 500 -- Max 500 studs
+    local lname = LP.Name:lower()
+    
+    -- Hanapin yung bag na may pangalan ng player, o "bag"/"loot" na malapit
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") or obj:IsA("BasePart") then
+            local n = obj.Name:lower()
+            if n:find("bag") or n:find("drop") or n:find(lname) then
+                local part = obj:IsA("BasePart") and obj or obj:FindFirstChildOfClass("BasePart")
+                if part then
+                    local d = (root.Position - part.Position).Magnitude
+                    if d < minDist then
+                        closestBag = part
+                        minDist = d
+                    end
+                end
+            end
+        end
+    end
+    return closestBag
+end
+
+local function onDied()
+    if not CFG.AutoRespawn then return end
+    task.wait(3) -- Wait para sa respawn screen
+    
+    -- Pindutin respawn
+    local remNames = {"Respawn", "RespawnPlayer", "PlayerRespawn", "Revive"}
+    for _, rname in ipairs(remNames) do
+        local rem = ReplicatedStorage:FindFirstChild(rname) or Workspace:FindFirstChild(rname)
+        if rem and rem:IsA("RemoteEvent") then
+            pcall(function() rem:FireServer() end)
+            break
+        end
+    end
+    
+    task.wait(1.5) -- Wait for character load
+    
+    -- Teleport sa bag
+    if CFG.RespawnToBag then
+        local newRoot = getRoot(LP)
+        local myBag = findOwnBag()
+        if newRoot and myBag then
+            newRoot.CFrame = myBag.CFrame + Vector3.new(0, 5, 0)
+        end
+    end
+end
+
+LP.CharacterAdded:Connect(function(char)
+    local hum = char:WaitForChild("Humanoid", 5)
+    if hum then
+        hum.Died:Connect(onDied)
+    end
+end)
+
+-- ============ ESP ============
 local espObjects = {}
 local function makeESP(player)
     if espObjects[player] then return end
@@ -204,7 +376,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ============ INFINITE JUMP (TAMANG PARAAN) ============
+-- ============ INFINITE JUMP ============
 UserInputService.JumpRequest:Connect(function()
     if CFG.InfiniteJump then
         local hum = getHum(LP)
@@ -251,7 +423,7 @@ local function serverHop()
     end)
 end
 
--- ============ UI SYSTEM (STRUCTURED) ============
+-- ============ UI SYSTEM ============
 if CoreGui:FindFirstChild("PrimodaxGUI") then CoreGui:FindFirstChild("PrimodaxGUI"):Destroy() end
 local SG = Instance.new("ScreenGui")
 SG.Name = "PrimodaxGUI"
@@ -280,7 +452,7 @@ local TL = Instance.new("TextLabel")
 TL.Size = UDim2.new(1, -50, 1, 0)
 TL.Position = UDim2.new(0, 10, 0, 0)
 TL.BackgroundTransparency = 1
-TL.Text = "⚡ PRIMODAX V6.1 ⚡"
+TL.Text = "⚡ PRIMODAX V6.2 ⚡"
 TL.TextColor3 = Color3.fromRGB(0, 0, 0)
 TL.TextSize = 15
 TL.Font = Enum.Font.GothamBold
@@ -412,6 +584,46 @@ local function makeSlider(name, key, min, max, order)
     end)
 end
 
+local function makeDropdown(name, key, options, order)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, -10, 0, 60)
+    frame.BackgroundTransparency = 1
+    frame.LayoutOrder = order
+    frame.Parent = SF
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, 0, 0, 20)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = name .. ": " .. CFG[key]
+    lbl.TextColor3 = Color3.fromRGB(200, 200, 200)
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 11
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = frame
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 30)
+    btn.Position = UDim2.new(0, 0, 0, 22)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.Text = "▼ " .. CFG[key]
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 11
+    btn.Parent = frame
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+    btn.MouseButton1Click:Connect(function()
+        for i, opt in ipairs(options) do
+            if CFG[key] == opt then
+                CFG[key] = options[i % #options + 1]
+                break
+            end
+        end
+        btn.Text = "▼ " .. CFG[key]
+        lbl.Text = name .. ": " .. CFG[key]
+    end)
+end
+
 -- ============ BUILD MENU ============
 makeSection("COMBAT", 1)
 makeToggle("Silent Aim", "SilentAim", 2)
@@ -423,6 +635,10 @@ makeToggle("Skip Friends", "SkipFriends", 6)
 makeSection("WEAPONS", 10)
 makeToggle("Unlimited Ammo", "UnlimitedAmmo", 11)
 makeToggle("Auto Reload", "AutoReload", 12)
+
+makeSection("PICKUP (LOOT)", 15)
+makeToggle("Auto Pickup", "AutoPickup", 16)
+makeDropdown("Priority Filter", "PickupPriority", {"Random", "Guns", "Heals", "Ammo"}, 17)
 
 makeSection("MOVEMENT", 20)
 makeToggle("Infinite Jump", "InfiniteJump", 21)
@@ -436,6 +652,10 @@ makeToggle("ESP (Player Info)", "ESPEnabled", 31)
 makeSection("BYPASS", 40)
 makeToggle("Anti Kick", "AntiKick", 41)
 makeToggle("Anti AFK", "AntiAfk", 42)
+
+makeSection("AUTO RESPAWN", 45)
+makeToggle("Enable Auto Respawn", "AutoRespawn", 46)
+makeToggle("Respawn to Own Bag", "RespawnToBag", 47)
 
 makeSection("SYSTEM", 50)
 local hopBtn = Instance.new("TextButton")
@@ -485,4 +705,4 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
-print("✅ PRIMODAX V6.1 Loaded — Baril gagana na, ESP at Aimbot ayos na.")
+print("✅ PRIMODAX V6.2 Loaded — Silent Aim Magnetic, Auto Pickup Filter, Bag Respawn")
