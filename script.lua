@@ -168,13 +168,13 @@ if Drawing then
     fovCircle.Radius    = CFG.SilentAimFOV
     fovCircle.Position  = screenCenter()
 
-    aimbotCircle            = Drawing.new("Circle")
-    aimbotCircle.Thickness  = 1.2
-    aimbotCircle.Color      = Color3.fromRGB(220,220,220)
-    aimbotCircle.Filled     = false
-    aimbotCircle.Visible    = false
-    aimbotCircle.Radius     = CFG.AimbotFOV
-    aimbotCircle.Position   = screenCenter()
+    aimbotCircle           = Drawing.new("Circle")
+    aimbotCircle.Thickness = 1.2
+    aimbotCircle.Color     = Color3.fromRGB(220,220,220)
+    aimbotCircle.Filled    = false
+    aimbotCircle.Visible   = false
+    aimbotCircle.Radius    = CFG.AimbotFOV
+    aimbotCircle.Position  = screenCenter()
 end
 
 -- ══════════════════════════════════════════════════════
@@ -563,7 +563,6 @@ end)
 -- ══════════════════════════════════════════════════════
 --  GUI SETUP
 -- ══════════════════════════════════════════════════════
--- destroy old instance if re-running
 pcall(function()
     local old=CoreGui:FindFirstChild("PRIMODAX_V6")
     if old then old:Destroy() end
@@ -593,8 +592,8 @@ local C={
     TOG_OFF =Color3.fromRGB(80,80,100),
     BLACK   =Color3.fromRGB(0,0,0),
 }
-local FONT    =Enum.Font.GothamBold
-local FONT_R  =Enum.Font.Gotham
+local FONT   = Enum.Font.GothamBold
+local FONT_R = Enum.Font.Gotham
 
 local function corner(r,p)
     local c=Instance.new("UICorner") c.CornerRadius=UDim.new(0,r) c.Parent=p
@@ -619,25 +618,33 @@ local function mkScroll(pr)
 end
 
 -- ══════════════════════════════════════════════════════
---  FLOATING CIRCLE BUBBLE  (always on top, draggable)
---  Visible only when menu is closed.
+--  MENU CONSTANTS
+-- ══════════════════════════════════════════════════════
+local MENU_W,MENU_H = 320,480
+local TITLE_H       = 42
+local TAB_W         = 90
+local MIN_H         = TITLE_H
+local menuOpen      = true
+local menuMinimised = false
+
+-- ══════════════════════════════════════════════════════
+--  OPEN BUBBLE  (≡ — tap to OPEN menu, shows when closed)
 -- ══════════════════════════════════════════════════════
 local bubble=mkBtn({
     Size            =UDim2.new(0,54,0,54),
-    Position        =UDim2.new(0,10,0.5,-27),   -- left-centre
+    Position        =UDim2.new(0,10,0.5,-27),
     BackgroundColor3=C.ACCENT,
     Text            ="≡",
     TextColor3      =C.TEXT,
     TextSize        =26,
     Font            =FONT,
-    ZIndex          =100,    -- always on top
-    Visible         =false,  -- hidden while menu open
+    ZIndex          =100,
+    Visible         =false,
     Parent          =SG,
 })
 corner(27,bubble)
 stroke(C.BORDER,2,bubble)
 
--- drag the bubble
 do
     local drag,ds,ps=false,nil,nil
     bubble.InputBegan:Connect(function(inp)
@@ -661,18 +668,48 @@ do
 end
 
 -- ══════════════════════════════════════════════════════
---  MAIN MENU  — portrait layout
---  Left rail: vertical tab buttons (width 90)
---  Right panel: content (fills rest)
---  Title bar across full top
+--  CLOSE BUBBLE  (▼ arrow — tap to CLOSE menu, shows when open)
 -- ══════════════════════════════════════════════════════
-local MENU_W,MENU_H = 320,480
-local menuOpen      = true
-local menuMinimised = false
-local TITLE_H       = 42
-local TAB_W         = 90
-local MIN_H         = TITLE_H  -- height when minimised
+local closeBubble=mkBtn({
+    Size            =UDim2.new(0,54,0,54),
+    Position        =UDim2.new(1,-66,0,60),
+    BackgroundColor3=Color3.fromRGB(30,30,42),
+    Text            ="▼",
+    TextColor3      =C.TEXT,
+    TextSize        =22,
+    Font            =FONT,
+    ZIndex          =100,
+    Visible         =false,
+    Parent          =SG,
+})
+corner(27,closeBubble)
+stroke(C.ACCENT,2,closeBubble)
 
+do
+    local drag,ds,ps=false,nil,nil
+    closeBubble.InputBegan:Connect(function(inp)
+        if inp.UserInputType==Enum.UserInputType.Touch
+        or inp.UserInputType==Enum.UserInputType.MouseButton1 then
+            drag=true ds=inp.Position ps=closeBubble.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(inp)
+        if not drag then return end
+        if inp.UserInputType==Enum.UserInputType.Touch
+        or inp.UserInputType==Enum.UserInputType.MouseMovement then
+            local d=inp.Position-ds
+            closeBubble.Position=UDim2.new(ps.X.Scale,ps.X.Offset+d.X,ps.Y.Scale,ps.Y.Offset+d.Y)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(inp)
+        if inp.UserInputType==Enum.UserInputType.Touch
+        or inp.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end
+    end)
+end
+
+-- ══════════════════════════════════════════════════════
+--  MAIN MENU FRAME
+-- ══════════════════════════════════════════════════════
 local menuFrame=mkFrame({
     Size            =UDim2.new(0,MENU_W,0,MENU_H),
     Position        =UDim2.new(0.5,-MENU_W/2,0.5,-MENU_H/2),
@@ -685,13 +722,18 @@ local menuFrame=mkFrame({
 corner(10,menuFrame)
 stroke(C.BORDER,1.5,menuFrame)
 
+-- ══════════════════════════════════════════════════════
+--  setMenuVisible  — wires both bubbles
+-- ══════════════════════════════════════════════════════
 local function setMenuVisible(v)
     menuOpen=v
     menuFrame.Visible=v
-    bubble.Visible=not v
+    bubble.Visible      =not v   -- ≡ open btn: visible when menu closed
+    closeBubble.Visible =v       -- ▼ close btn: visible when menu open
 end
-setMenuVisible(true)
+
 bubble.MouseButton1Click:Connect(function() setMenuVisible(true) end)
+closeBubble.MouseButton1Click:Connect(function() setMenuVisible(false) end)
 
 -- ── title bar ───────────────────────────────────────
 local titleBar=mkFrame({
@@ -702,7 +744,6 @@ local titleBar=mkFrame({
     ZIndex          =11,
     Parent          =menuFrame,
 })
--- square bottom corners on titleBar
 mkFrame({Size=UDim2.new(1,0,0.5,0),Position=UDim2.new(0,0,0.5,0),
     BackgroundColor3=C.BG2,BorderSizePixel=0,ZIndex=10,Parent=titleBar})
 corner(10,titleBar)
@@ -716,24 +757,13 @@ mkLabel({
 })
 mkLabel({
     Size=UDim2.new(1,-80,0,16),Position=UDim2.new(0,10,0,22),
-    BackgroundTransparency=1,
-    Text="by BoboyTagaAquarius",
+    BackgroundTransparency=1,Text="by BoboyTagaAquarius",
     TextColor3=C.SUBTEXT,TextSize=10,Font=FONT_R,
     TextXAlignment=Enum.TextXAlignment.Left,ZIndex=12,Parent=titleBar,
 })
 
--- close → bubble
-local closeBtn=mkBtn({
-    Size=UDim2.new(0,28,0,28),Position=UDim2.new(1,-34,0.5,-14),
-    BackgroundColor3=C.RED,Text="✕",TextColor3=C.TEXT,TextSize=13,Font=FONT,
-    ZIndex=13,Parent=titleBar,
-})
-corner(6,closeBtn)
-closeBtn.MouseButton1Click:Connect(function() setMenuVisible(false) end)
-
--- minimise
 local minBtn=mkBtn({
-    Size=UDim2.new(0,28,0,28),Position=UDim2.new(1,-68,0.5,-14),
+    Size=UDim2.new(0,28,0,28),Position=UDim2.new(1,-34,0.5,-14),
     BackgroundColor3=C.BG,Text="–",TextColor3=C.TEXT,TextSize=18,Font=FONT,
     ZIndex=13,Parent=titleBar,
 })
@@ -784,8 +814,6 @@ local tabLayout=Instance.new("UIListLayout",tabRail)
 tabLayout.Padding=UDim.new(0,4)
 tabLayout.SortOrder=Enum.SortOrder.LayoutOrder
 Instance.new("UIPadding",tabRail).PaddingTop=UDim.new(0,6)
-
--- square top-right corner on rail
 mkFrame({Size=UDim2.new(0,10,1,0),Position=UDim2.new(1,-10,0,0),
     BackgroundColor3=C.BG2,BorderSizePixel=0,ZIndex=10,Parent=tabRail})
 
@@ -805,13 +833,13 @@ local contentPanel=mkScroll({
 
 -- ── tab definitions ─────────────────────────────────
 local TABS={
-    {name="Config",     icon="⚙"},
-    {name="Bypass",     icon="🛡"},
-    {name="Visuals",    icon="👁"},
-    {name="Combat",     icon="🎯"},
-    {name="Survival",   icon="🏃"},
-    {name="Weapons",    icon="🔫"},
-    {name="MdKyamamoto",icon="⚡"},
+    {name="Config",      icon="⚙"},
+    {name="Bypass",      icon="🛡"},
+    {name="Visuals",     icon="👁"},
+    {name="Combat",      icon="🎯"},
+    {name="Survival",    icon="🏃"},
+    {name="Weapons",     icon="🔫"},
+    {name="MdKyamamoto", icon="⚡"},
 }
 
 local tabBtns  = {}
@@ -828,7 +856,6 @@ local function switchTab(name)
 end
 
 for i,tab in ipairs(TABS) do
-    -- tab button in left rail
     local btn=mkBtn({
         Size            =UDim2.new(1,-8,0,52),
         BackgroundColor3=C.TAB_OFF,
@@ -845,26 +872,27 @@ for i,tab in ipairs(TABS) do
     corner(6,btn)
     tabBtns[tab.name]=btn
 
-    -- content page inside contentPanel
     local page=mkFrame({
-        Size            =UDim2.new(1,0,1,0),
+        Size                =UDim2.new(1,0,1,0),
         BackgroundTransparency=1,
-        ZIndex          =12,
-        Visible         =false,
-        Parent          =contentPanel,
+        ZIndex              =12,
+        Visible             =false,
+        Parent              =contentPanel,
     })
     local layout=Instance.new("UIListLayout",page)
     layout.Padding=UDim.new(0,5)
     layout.SortOrder=Enum.SortOrder.LayoutOrder
     local pad=Instance.new("UIPadding",page)
-    pad.PaddingTop=UDim.new(0,8) pad.PaddingLeft=UDim.new(0,8) pad.PaddingRight=UDim.new(0,8)
+    pad.PaddingTop=UDim.new(0,8)
+    pad.PaddingLeft=UDim.new(0,8)
+    pad.PaddingRight=UDim.new(0,8)
     tabPages[tab.name]=page
 
     btn.MouseButton1Click:Connect(function() switchTab(tab.name) end)
 end
 
 -- ══════════════════════════════════════════════════════
---  WIDGET BUILDERS  (content panel width = MENU_W-TAB_W-16)
+--  WIDGET BUILDERS
 -- ══════════════════════════════════════════════════════
 local function addSectionHeader(page,txt,order)
     local l=mkLabel({
@@ -905,7 +933,7 @@ local function addToggle(page,labelTxt,cfgKey,order,onChange)
     corner(11,pill)
     local knob=mkFrame({
         Size=UDim2.new(0,16,0,16),
-        Position=UDim2.new(CFG[cfgKey] and 1 or 0, CFG[cfgKey] and -19 or 3, 0.5,-8),
+        Position=UDim2.new(CFG[cfgKey] and 1 or 0,CFG[cfgKey] and -19 or 3,0.5,-8),
         BackgroundColor3=C.TEXT,BorderSizePixel=0,ZIndex=15,Parent=pill,
     })
     corner(8,knob)
@@ -943,7 +971,8 @@ local function addSlider(page,labelTxt,cfgKey,minV,maxV,order,fmt,onChange)
     })
     corner(3,track)
     local pct=(CFG[cfgKey]-minV)/(maxV-minV)
-    local fill=mkFrame({Size=UDim2.new(pct,0,1,0),BackgroundColor3=C.ACCENT,BorderSizePixel=0,ZIndex=15,Parent=track})
+    local fill=mkFrame({Size=UDim2.new(pct,0,1,0),BackgroundColor3=C.ACCENT,
+        BorderSizePixel=0,ZIndex=15,Parent=track})
     corner(3,fill)
     local thumb=mkBtn({
         Size=UDim2.new(0,14,0,14),Position=UDim2.new(pct,-7,0.5,-7),
@@ -1004,39 +1033,34 @@ local function addTextBox(page,placeholder,order,cb)
 end
 
 -- ══════════════════════════════════════════════════════
---  CONFIG TAB
+--  CONFIG TAB  — Save Config only
 -- ══════════════════════════════════════════════════════
 local pg=tabPages["Config"]
 local ord=0
 local function o() ord=ord+1 return ord end
 
-addSectionHeader(pg,"▸ SAVE / LOAD",o())
-addButton(pg,"💾 Save Config",C.ACCENT2,o(),function() saveConfig() end)
-addButton(pg,"📂 Load Config",C.ACCENT, o(),function() loadConfig() end)
-
-addSectionHeader(pg,"▸ IMPORT CONFIG",o())
-addLabel(pg,"Paste JSON then tap Import:",o())
-local importBox=addTextBox(pg,'{"SilentAim":false,...}',o())
-addButton(pg,"⬇ Import",C.ACCENT,o(),function()
-    local txt=importBox.Text
-    if txt and #txt>2 then
-        local ok=importFromString(txt)
-        importBox.Text=ok and "✔ Applied!" or "✘ Bad JSON"
-    end
+addButton(pg,"💾  Save Config",C.ACCENT2,o(),function()
+    saveConfig()
 end)
-
-addSectionHeader(pg,"▸ EXECUTOR BYPASS",o())
-addToggle(pg,"Hide Executor",  "HideExecutor",o())
-addToggle(pg,"Anti-Kick",      "AntiKick",     o())
 
 -- ══════════════════════════════════════════════════════
 --  BYPASS TAB
 -- ══════════════════════════════════════════════════════
 pg=tabPages["Bypass"] ord=0
 addSectionHeader(pg,"▸ BYPASS",o())
-addToggle(pg,"Anti-Kick",       "AntiKick",     o())
-addToggle(pg,"Hide Executor",   "HideExecutor", o())
-addLabel(pg,"WalkSpeed spoof + CFrame block active.",o())
+addToggle(pg,"Anti-Kick",     "AntiKick",     o())
+addToggle(pg,"Hide Executor", "HideExecutor", o())
+addSectionHeader(pg,"▸ IMPORT CONFIG",o())
+addLabel(pg,"Paste JSON then tap Import:",o())
+local importBox=addTextBox(pg,'{"SilentAim":false,...}',o())
+addButton(pg,"⬇  Import",C.ACCENT,o(),function()
+    local txt=importBox.Text
+    if txt and #txt>2 then
+        local ok=importFromString(txt)
+        importBox.Text=ok and "✔ Applied!" or "✘ Bad JSON"
+    end
+end)
+addButton(pg,"📂  Load Config",C.ACCENT,o(),function() loadConfig() end)
 
 -- ══════════════════════════════════════════════════════
 --  VISUALS TAB
@@ -1050,28 +1074,27 @@ addToggle(pg,"Aimbot Circle",   "ShowAimbotFOV",o())
 addSlider(pg,"Silent FOV",      "SilentAimFOV",30,400,o()," px")
 addSlider(pg,"Aimbot FOV",      "AimbotFOV",   30,600,o()," px")
 addSectionHeader(pg,"▸ WIDESCREEN",o())
-addToggle(pg,"Widescreen","WideScreen",o())
-addSlider(pg,"Camera FOV","WideScreenFOV",70,120,o(),"°")
+addToggle(pg,"Widescreen",      "WideScreen",  o())
+addSlider(pg,"Camera FOV",      "WideScreenFOV",70,120,o(),"°")
 
 -- ══════════════════════════════════════════════════════
 --  COMBAT TAB
 -- ══════════════════════════════════════════════════════
 pg=tabPages["Combat"] ord=0
 addSectionHeader(pg,"▸ SILENT AIM",o())
-addToggle(pg,"Silent Aim",      "SilentAim",       o())
-addSlider(pg,"SA FOV",          "SilentAimFOV",30,400,o()," px")
-addSlider(pg,"SA Sticky",       "SilentAimSticky",0,100,o(),"%",
+addToggle(pg,"Silent Aim",    "SilentAim",         o())
+addSlider(pg,"SA FOV",        "SilentAimFOV",30,400,o()," px")
+addSlider(pg,"SA Sticky",     "SilentAimSticky",0,100,o(),"%",
     function(v) CFG.SilentAimSticky=v/100 end)
-
 addSectionHeader(pg,"▸ AIMBOT",o())
-addToggle(pg,"Aimbot (hold Q)","Aimbot",o(),function(on) if on then startAimbotLoop() end end)
-addSlider(pg,"AB FOV",         "AimbotFOV",   30,600,o()," px")
-addSlider(pg,"Smoothing",      "AimbotSmoothing",1,100,o(),"%",
+addToggle(pg,"Aimbot (hold Q)","Aimbot",o(),
+    function(on) if on then startAimbotLoop() end end)
+addSlider(pg,"AB FOV",        "AimbotFOV",   30,600,o()," px")
+addSlider(pg,"Smoothing",     "AimbotSmoothing",1,100,o(),"%",
     function(v) CFG.AimbotSmoothing=v/100 end)
-addSlider(pg,"AB Sticky",      "AimbotSticky",0,100,o(),"%",
+addSlider(pg,"AB Sticky",     "AimbotSticky",0,100,o(),"%",
     function(v) CFG.AimbotSticky=v/100 end)
 
--- mobile aim hold button (floating)
 local aimHoldBtn=mkBtn({
     Size=UDim2.new(0,60,0,60),Position=UDim2.new(1,-72,1,-74),
     BackgroundColor3=Color3.fromRGB(220,60,60),
@@ -1088,17 +1111,17 @@ aimHoldBtn.InputEnded:Connect(function()  setAimbotOn(false) end)
 -- ══════════════════════════════════════════════════════
 pg=tabPages["Survival"] ord=0
 addSectionHeader(pg,"▸ MOVEMENT",o())
-addToggle(pg,"Auto Sprint",     "AutoSprint",       o())
-addSlider(pg,"Sprint Speed",    "SprintSpeed",16,60,o())
-addToggle(pg,"Float Mode",      "FloatMode",        o())
-addSlider(pg,"Float Power",     "FloatPower",10,200,o())
-addToggle(pg,"Noclip",          "Noclip",           o())
+addToggle(pg,"Auto Sprint",    "AutoSprint",        o())
+addSlider(pg,"Sprint Speed",   "SprintSpeed",16,60, o())
+addToggle(pg,"Float Mode",     "FloatMode",         o())
+addSlider(pg,"Float Power",    "FloatPower",10,200, o())
+addToggle(pg,"Noclip",         "Noclip",            o())
 addSectionHeader(pg,"▸ LOOT",o())
-addToggle(pg,"Auto Pickup",     "AutoPickup",       o())
-addSlider(pg,"Pickup Range",    "AutoPickupRange",5,150,o()," st")
+addToggle(pg,"Auto Pickup",    "AutoPickup",        o())
+addSlider(pg,"Pickup Range",   "AutoPickupRange",5,150,o()," st")
 addSectionHeader(pg,"▸ RESPAWN",o())
-addToggle(pg,"Auto Respawn",    "AutoRespawn",      o())
-addToggle(pg,"Respawn → Bag",   "AutoRespawnLoot",  o())
+addToggle(pg,"Auto Respawn",   "AutoRespawn",       o())
+addToggle(pg,"Respawn → Bag",  "AutoRespawnLoot",   o())
 
 -- ══════════════════════════════════════════════════════
 --  WEAPONS TAB
@@ -1117,4 +1140,5 @@ addLabel(pg,"Custom remote hooks go here.",o())
 
 -- ── boot ────────────────────────────────────────────
 switchTab("Config")
+setMenuVisible(true)
 print("[PRIMODAX v6.1] Vagrant Survival v10 — BoboyTagaAquarius — loaded.")
