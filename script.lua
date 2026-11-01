@@ -5,26 +5,18 @@
 -- ██║     ██║  ██║██║██║ ╚═╝ ██║╚██████╔╝██████╔╝██║  ██║██╔╝ ██╗
 -- ╚═╝     ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
 -- PRIMODAXVGRANT | Vagrant Survival
--- Version  : 5.2
+-- Version  : 5.3 (fixed + bypass+)
 -- Admin    : PRIMODAX
 -- Game     : Vagrant Survival v10 (Roblox) — Team Stultus
 -- Executor : Delta, Arceus X, Fluxus
 --
--- CHANGES v5.0:
---   • All features DEFAULT OFF except AntiKick + HideExecutor
---   • Noclip: server-safe — cancels collision client-side ONLY on non-root
---     parts, no BodyVelocity, no speed event, reconnect issue fixed
---   • Silent Aim: FOV circle IS the targeting zone — target inside circle
---     gets aim redirected. Separate FOV from Aimbot FOV.
---   • Aimbot: improved prediction, smoothing slider, correct CFrame lerp
---   • Auto Sprint: sets WalkSpeed high passively without firing speed remotes
---   • Infinite Jump → Float Mode: hold Space = continuous upward velocity,
---     release = stop. No BodyVelocity kick surface (uses Humanoid.Jump loop)
---   • Auto Pickup: improved range + ProximityPrompt + ClickDetector + Touch
---   • iPad/wide viewport support: UI scales relative to ViewportSize
---   • Floating circle toggle: bottom-center, draggable, always visible
---   • Config save/load/export/import
---   • BG image placeholder wired
+-- FIXES v5.3:
+--   • makeSection / makeToggle / makeSlider / toggleRefs defined BEFORE use
+--   • Bypass: hookmetamethod namecall hook made more resilient
+--   • Bypass: HideExecutor now also strips _G executor markers
+--   • Bypass: AntiKick pattern list expanded
+--   • Bypass: speed event swallowing covers "walkspeed" + "movespeed"
+--   • Drawing API guarded — graceful skip if executor doesn't expose it
 
 -- ══════════════════════════════════════════════════════
 --  SERVICES
@@ -44,17 +36,15 @@ local Cam = Workspace.CurrentCamera
 --  CONFIG — ALL OFF BY DEFAULT except bypass
 -- ══════════════════════════════════════════════════════
 local CFG = {
-    -- combat
     SilentAim        = false,
     SilentAimPart    = "Head",
-    SilentAimFOV     = 120,    -- radius in pixels; circle = targeting zone
+    SilentAimFOV     = 120,
     Aimbot           = false,
     AimbotSmoothing  = 0.12,
     AimbotPart       = "Head",
-    AimbotFOV        = 180,    -- separate from silent aim FOV
+    AimbotFOV        = 180,
     ShowFOV          = true,
     FOVColor         = Color3.fromRGB(255, 215, 0),
-    -- utility
     UnlimitedAmmo    = false,
     AutoReload       = false,
     AutoPickup       = false,
@@ -62,15 +52,12 @@ local CFG = {
     AutoRespawn      = false,
     AutoRespawnLoot  = false,
     AutoSprint       = false,
-    SprintSpeed      = 28,     -- vanilla walk = 16; 28 feels natural, no kick
-    -- movement
-    FloatMode        = false,  -- hold Space = fly upward, release = stop
-    FloatPower       = 55,     -- upward stud/s while Space held
+    SprintSpeed      = 28,
+    FloatMode        = false,
+    FloatPower       = 55,
     Noclip           = false,
-    -- visual
     ESPEnabled       = false,
     ESPColor         = Color3.fromRGB(255, 50, 50),
-    -- bypass (ON by default)
     AntiKick         = true,
     HideExecutor     = true,
 }
@@ -134,11 +121,11 @@ pcall(loadConfig)
 -- ══════════════════════════════════════════════════════
 --  UTILITY
 -- ══════════════════════════════════════════════════════
-local function getChar(p)  return p and p.Character end
-local function getHum(p)   local c=getChar(p) return c and c:FindFirstChildOfClass("Humanoid") end
-local function getRoot(p)  local c=getChar(p) return c and c:FindFirstChild("HumanoidRootPart") end
+local function getChar(p)   return p and p.Character end
+local function getHum(p)    local c=getChar(p) return c and c:FindFirstChildOfClass("Humanoid") end
+local function getRoot(p)   local c=getChar(p) return c and c:FindFirstChild("HumanoidRootPart") end
 local function getPart(p,n) local c=getChar(p) return c and c:FindFirstChild(n) end
-local function isAlive(p)  local h=getHum(p) return h and h.Health>0 end
+local function isAlive(p)   local h=getHum(p) return h and h.Health>0 end
 
 local function toScreen(pos)
     local s, on = Cam:WorldToViewportPoint(pos)
@@ -151,7 +138,6 @@ local function dist2D(sp)
     return (sp - screenCenter()).Magnitude
 end
 
--- best enemy inside given pixel-radius FOV
 local function getNearestEnemy(fovRadius, targetPart)
     local best, bDist, bPos = nil, fovRadius, nil
     for _, p in ipairs(Players:GetPlayers()) do
@@ -172,48 +158,62 @@ local function getNearestEnemy(fovRadius, targetPart)
 end
 
 -- ══════════════════════════════════════════════════════
---  FOV CIRCLE (Drawing) — silent aim zone indicator
+--  FOV CIRCLES — guarded: Drawing may not exist on all executors
 -- ══════════════════════════════════════════════════════
-local fovCircle         = Drawing.new("Circle")
-fovCircle.Thickness     = 1.5
-fovCircle.Color         = CFG.FOVColor
-fovCircle.Filled        = false
-fovCircle.Visible       = CFG.ShowFOV
-fovCircle.Radius        = CFG.SilentAimFOV
-fovCircle.Position      = screenCenter()
+local fovCircle, aimbotCircle
+if Drawing then
+    fovCircle           = Drawing.new("Circle")
+    fovCircle.Thickness = 1.5
+    fovCircle.Color     = CFG.FOVColor
+    fovCircle.Filled    = false
+    fovCircle.Visible   = CFG.ShowFOV
+    fovCircle.Radius    = CFG.SilentAimFOV
+    fovCircle.Position  = screenCenter()
 
--- second circle for aimbot FOV (white, thinner)
-local aimbotCircle      = Drawing.new("Circle")
-aimbotCircle.Thickness  = 1
-aimbotCircle.Color      = Color3.fromRGB(200, 200, 200)
-aimbotCircle.Filled     = false
-aimbotCircle.Visible    = false
-aimbotCircle.Radius     = CFG.AimbotFOV
-aimbotCircle.Position   = screenCenter()
+    aimbotCircle           = Drawing.new("Circle")
+    aimbotCircle.Thickness = 1
+    aimbotCircle.Color     = Color3.fromRGB(200, 200, 200)
+    aimbotCircle.Filled    = false
+    aimbotCircle.Visible   = false
+    aimbotCircle.Radius    = CFG.AimbotFOV
+    aimbotCircle.Position  = screenCenter()
+end
 
 -- ══════════════════════════════════════════════════════
---  BYPASS: HIDE EXECUTOR GLOBALS
+--  BYPASS v5.3: HIDE EXECUTOR GLOBALS
+--  Also nukes _G executor markers that Vagrant Survival probes.
 -- ══════════════════════════════════════════════════════
 pcall(function()
     if not CFG.HideExecutor then return end
-    local mt = getrawmetatable(game)
-    setreadonly(mt, false)
+    -- nil out _G markers
+    local EXEC_KEYS = {
+        "syn","fluxus","DELTA","Delta","delta","getgenv","is_executor_closure",
+        "rconsole","hookfunction","hookmetamethod","checkcaller","cloneref",
+        "FLUXUS_KEY","DELTA_KEY","ARCEUS_KEY","KRNL_LOADED",
+    }
+    for _, k in ipairs(EXEC_KEYS) do
+        pcall(function() _G[k] = nil end)
+    end
+    -- metatable hook to intercept game[key] probes
+    local ok, mt = pcall(getrawmetatable, game)
+    if not ok then return end
+    pcall(setreadonly, mt, false)
     local _oi = mt.__index
     mt.__index = newcclosure(function(self, k)
-        if k=="Executor" or k=="executor" or k=="syn"
-        or k=="fluxus" or k=="DELTA" or k=="getgenv" then return nil end
+        local lk = tostring(k):lower()
+        if lk=="executor" or lk=="syn"   or lk=="fluxus"
+        or lk=="delta"    or lk=="getgenv" or lk=="is_executor_closure"
+        or lk=="krnl_loaded" or lk:find("executor") then
+            return nil
+        end
         return _oi(self, k)
     end)
-    setreadonly(mt, true)
+    pcall(setreadonly, mt, true)
 end)
 
 -- ══════════════════════════════════════════════════════
---  BYPASS: ANTI-KICK + SILENT AIM (single __namecall hook)
---
---  Silent aim fix: Vagrant Survival fires shooting remotes with
---  a Vector3 hit position AND a BasePart hit instance.
---  We replace BOTH when a target is inside the silent aim FOV circle.
---  The hook only fires on FireServer/InvokeServer — safe.
+--  BYPASS v5.3: ANTI-KICK + SILENT AIM (single __namecall hook)
+--  Expanded pattern list covers more Vagrant Survival detection remotes.
 -- ══════════════════════════════════════════════════════
 local silentTarget = nil
 
@@ -223,18 +223,20 @@ _nc = hookmetamethod(game, "__namecall", function(self, ...)
     local args   = {...}
 
     if method == "FireServer" or method == "InvokeServer" then
-        -- anti-kick: swallow detection remotes
         if CFG.AntiKick then
-            local n = (self.Name or ""):lower()
-            if n:find("kick")   or n:find("ban")      or n:find("cheat")
-            or n:find("detect") or n:find("anticheat") or n:find("report")
-            or n:find("flag")   or n:find("speed")    or n:find("velocity")
-            or n:find("noclip") or n:find("collide") then
+            local n = (typeof(self) == "Instance" and self.Name or ""):lower()
+            -- expanded detection keyword list v5.3
+            if n:find("kick")       or n:find("ban")        or n:find("cheat")
+            or n:find("detect")     or n:find("anticheat")  or n:find("report")
+            or n:find("flag")       or n:find("speed")      or n:find("velocity")
+            or n:find("noclip")     or n:find("collide")    or n:find("walkspeed")
+            or n:find("movespeed")  or n:find("exploit")    or n:find("hack")
+            or n:find("sanity")     or n:find("integrity")  or n:find("verify")
+            or n:find("position")   or n:find("teleport")   or n:find("tphack") then
                 return nil
             end
         end
 
-        -- silent aim: redirect Vector3 + BasePart args toward target
         if CFG.SilentAim and silentTarget and isAlive(silentTarget) then
             local part = getPart(silentTarget, CFG.SilentAimPart)
             if part then
@@ -244,7 +246,6 @@ _nc = hookmetamethod(game, "__namecall", function(self, ...)
                     elseif typeof(v) == "Instance" and v:IsA("BasePart") then
                         args[i] = part
                     elseif typeof(v) == "Instance" and v:IsA("Model") then
-                        -- some games pass Character model — redirect to target char
                         local tc = getChar(silentTarget)
                         if tc then args[i] = tc end
                     end
@@ -257,9 +258,7 @@ _nc = hookmetamethod(game, "__namecall", function(self, ...)
 end)
 
 -- ══════════════════════════════════════════════════════
---  AIMBOT (hold Q on desktop; toggle button on mobile)
---  Uses a separate AimbotFOV radius, independent of silent FOV.
---  Smoothing is lerp factor per frame — lower = smoother/slower.
+--  AIMBOT
 -- ══════════════════════════════════════════════════════
 local aimbotOn = false
 UserInputService.InputBegan:Connect(function(inp, gpe)
@@ -271,11 +270,7 @@ UserInputService.InputEnded:Connect(function(inp)
 end)
 
 -- ══════════════════════════════════════════════════════
---  FLOAT MODE (replaces old fly + infinite jump)
---  Space held → HRP gets an upward CFrame nudge each Stepped.
---  No BodyVelocity instance → no anticheat surface.
---  Release Space → stops immediately.
---  For true "fly around" feel: W/A/S/D still moves normally via Humanoid.
+--  FLOAT MODE
 -- ══════════════════════════════════════════════════════
 RunService.Stepped:Connect(function(_, dt)
     if not CFG.FloatMode then return end
@@ -283,12 +278,10 @@ RunService.Stepped:Connect(function(_, dt)
     if not root then return end
     if UserInputService:IsKeyDown(Enum.KeyCode.Space)
     or UserInputService:IsKeyDown(Enum.KeyCode.ButtonA) then
-        -- nudge upward — client-side CFrame move, no physics object created
         root.CFrame = root.CFrame + Vector3.new(0, CFG.FloatPower * dt, 0)
     end
 end)
 
--- also handle mobile jump button hold via Humanoid Jump loop
 local floatConn = nil
 local function startFloatLoop(hum)
     if floatConn then floatConn:Disconnect() end
@@ -302,10 +295,7 @@ local function startFloatLoop(hum)
 end
 
 -- ══════════════════════════════════════════════════════
---  NOCLIP (server-safe version)
---  Cancels CanCollide on character parts EXCEPT HumanoidRootPart.
---  HRP keeps collision so server doesn't flag position teleports.
---  Swallows "noclip"/"collide" detection remotes in the hook above.
+--  NOCLIP
 -- ══════════════════════════════════════════════════════
 RunService.Stepped:Connect(function()
     if not CFG.Noclip then return end
@@ -320,8 +310,6 @@ end)
 
 -- ══════════════════════════════════════════════════════
 --  AUTO SPRINT
---  Sets WalkSpeed passively each Heartbeat — no remote fired,
---  no speed event triggered. Resets on death via CharacterAdded.
 -- ══════════════════════════════════════════════════════
 RunService.Heartbeat:Connect(function()
     if not CFG.AutoSprint then return end
@@ -358,36 +346,25 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ══════════════════════════════════════════════════════
---  AUTO PICKUP (improved: ProximityPrompt + ClickDetector + TouchPart)
+--  AUTO PICKUP
 -- ══════════════════════════════════════════════════════
--- AUTO PICKUP v5.2
--- Scans ALL descendants of Workspace for any pickup-able object.
--- ProximityPrompt fired via fireproximityprompt (executor API).
--- ClickDetector fired via fireclickdetector.
--- Also fires any RemoteEvent/RemoteFunction named like a pickup.
--- Player's own dropped bag/loot is included via PlayerBag scan.
-
 local PICKUP_FOLDERS = {
     "Loots","Items","Drops","Pickups","Collectibles",
     "Weapons","Loot","Spawns","WorldItems","GroundItems",
     "DroppedItems","Interactables","Resources","Ammo","Supplies",
 }
 
--- try to fire all known pickup remote patterns on an object
 local function tryPickup(obj, root)
-    -- ProximityPrompt
     for _, v in ipairs(obj:GetDescendants()) do
         if v:IsA("ProximityPrompt") then
             pcall(fireproximityprompt, v)
         end
     end
-    -- ClickDetector
     for _, v in ipairs(obj:GetDescendants()) do
         if v:IsA("ClickDetector") then
             pcall(fireclickdetector, v)
         end
     end
-    -- RemoteEvent with pickup-like name
     for _, v in ipairs(obj:GetDescendants()) do
         if v:IsA("RemoteEvent") then
             local n = v.Name:lower()
@@ -399,7 +376,6 @@ local function tryPickup(obj, root)
     end
 end
 
--- scan a folder for nearby pickups
 local function scanFolder(folder, root)
     if not folder then return end
     for _, obj in ipairs(folder:GetChildren()) do
@@ -414,27 +390,12 @@ local function scanFolder(folder, root)
     end
 end
 
--- also scan ReplicatedStorage for dropped bag remotes
-local function scanRSPickups(root)
-    for _, v in ipairs(ReplicatedStorage:GetDescendants()) do
-        if v:IsA("RemoteEvent") then
-            local n = v.Name:lower()
-            if n:find("loot") or n:find("bag") or n:find("drop")
-            or n:find("pick") or n:find("collect") then
-                pcall(function() v:FireServer(root.Position) end)
-            end
-        end
-    end
-end
-
 RunService.Heartbeat:Connect(function()
     if not CFG.AutoPickup then return end
     local root = getRoot(LP) if not root then return end
-    -- named folders
     for _, fname in ipairs(PICKUP_FOLDERS) do
         scanFolder(Workspace:FindFirstChild(fname), root)
     end
-    -- scan entire Workspace top-level children not in a named folder
     for _, obj in ipairs(Workspace:GetChildren()) do
         if not obj:IsA("Model") or obj == getChar(LP) then continue end
         local part = obj:FindFirstChildOfClass("BasePart")
@@ -450,15 +411,9 @@ end)
 -- ══════════════════════════════════════════════════════
 --  AUTO RESPAWN
 -- ══════════════════════════════════════════════════════
--- AUTO RESPAWN v5.2
--- On death: fires respawn remote, then teleports to OWN dropped bag/loot
--- if AutoRespawnLoot is ON. Scans Workspace for a Model/Part whose
--- name contains the player's username (dropped bag pattern in Vagrant Survival).
-
 local RESPAWN_FOLDERS = {"LootBoxes","LootZones","Crates","Chests","Lootboxes","Bags","DroppedBags","PlayerLoot"}
 
 local function findOwnBag()
-    -- look for any Workspace object named after LP or containing "bag"/"loot"+"LP.Name"
     local root = getRoot(LP) if not root then return nil end
     local best, bDist = nil, math.huge
     local lname = LP.Name:lower()
@@ -479,10 +434,8 @@ end
 local function nearestLootbox()
     local root = getRoot(LP) if not root then return nil end
     local best, bDist = nil, math.huge
-    -- check own bag first
     local ownBag = findOwnBag()
     if ownBag then return ownBag end
-    -- fallback to world lootboxes
     for _, fname in ipairs(RESPAWN_FOLDERS) do
         local f = Workspace:FindFirstChild(fname)
         if f then
@@ -505,7 +458,6 @@ local function onCharAdded(char)
     startFloatLoop(hum)
     hum.Died:Connect(function()
         if not CFG.AutoRespawn then return end
-        -- try respawn remotes
         task.wait(3)
         local remNames = {"Respawn","RespawnPlayer","PlayerRespawn","RevivePlayer","Revive"}
         for _, rname in ipairs(remNames) do
@@ -518,9 +470,8 @@ local function onCharAdded(char)
         end
         task.wait(1)
         if not isAlive(LP) then pcall(function() LP:LoadCharacter() end) end
-        -- after respawn: teleport to own bag/loot
         if CFG.AutoRespawnLoot then
-            task.wait(1.5)  -- wait for character to load
+            task.wait(1.5)
             local newRoot = getRoot(LP)
             if newRoot then
                 local lb = nearestLootbox()
@@ -538,12 +489,13 @@ if LP.Character then task.spawn(function() onCharAdded(LP.Character) end) end
 -- ══════════════════════════════════════════════════════
 local espObjects = {}
 local function makeESP(player)
-    local box       = Drawing.new("Square")
+    if not Drawing then return end
+    local box  = Drawing.new("Square")
     box.Visible=false box.Color=CFG.ESPColor box.Thickness=1 box.Filled=false
-    local name      = Drawing.new("Text")
+    local name = Drawing.new("Text")
     name.Visible=false name.Color=Color3.fromRGB(255,255,255)
     name.Size=14 name.Center=true name.Outline=true
-    local dist      = Drawing.new("Text")
+    local dist = Drawing.new("Text")
     dist.Visible=false dist.Color=Color3.fromRGB(255,215,0)
     dist.Size=12 dist.Center=true dist.Outline=true
     espObjects[player] = {box=box,name=name,dist=dist}
@@ -562,19 +514,20 @@ Players.PlayerRemoving:Connect(removeESP)
 RunService.RenderStepped:Connect(function()
     local center = screenCenter()
 
-    -- FOV circles
-    fovCircle.Position   = center
-    fovCircle.Visible    = CFG.ShowFOV and CFG.SilentAim
-    fovCircle.Radius     = CFG.SilentAimFOV
-    aimbotCircle.Position = center
-    aimbotCircle.Visible  = CFG.ShowFOV and CFG.Aimbot and aimbotOn
-    aimbotCircle.Radius   = CFG.AimbotFOV
+    if fovCircle then
+        fovCircle.Position  = center
+        fovCircle.Visible   = CFG.ShowFOV and CFG.SilentAim
+        fovCircle.Radius    = CFG.SilentAimFOV
+    end
+    if aimbotCircle then
+        aimbotCircle.Position = center
+        aimbotCircle.Visible  = CFG.ShowFOV and CFG.Aimbot and aimbotOn
+        aimbotCircle.Radius   = CFG.AimbotFOV
+    end
 
-    -- silent aim: target = nearest enemy inside silent FOV circle
-    local sTarget, _ = getNearestEnemy(CFG.SilentAimFOV, CFG.SilentAimPart)
-    silentTarget = CFG.SilentAim and sTarget or nil
+    local sTarget = getNearestEnemy(CFG.SilentAimFOV, CFG.SilentAimPart)
+    silentTarget  = CFG.SilentAim and sTarget or nil
 
-    -- aimbot: separate FOV, separate target
     if CFG.Aimbot and aimbotOn then
         local aTarget, aPos = getNearestEnemy(CFG.AimbotFOV, CFG.AimbotPart)
         if aTarget and aPos then
@@ -589,7 +542,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- ESP
     for player, e in pairs(espObjects) do
         local function hide()
             e.box.Visible=false e.name.Visible=false e.dist.Visible=false
@@ -620,9 +572,6 @@ end)
 
 -- ══════════════════════════════════════════════════════
 --  GUI SETUP
---  iPad/wide support: panel width scales to viewport width.
---  On narrow phone (~400px): panel = 270px wide
---  On iPad wide (~1024px): panel = 380px wide, font bumps up
 -- ══════════════════════════════════════════════════════
 if CoreGui:FindFirstChild("PrimodaxGUI") then
     CoreGui:FindFirstChild("PrimodaxGUI"):Destroy()
@@ -635,7 +584,6 @@ SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 SG.IgnoreGuiInset = true
 SG.Parent         = CoreGui
 
--- responsive sizing
 local vp     = Cam.ViewportSize
 local isWide = vp.X > 700
 local PANEL_W   = isWide and 380 or 270
@@ -644,7 +592,7 @@ local BASE_FONT = isWide and 14  or 12
 local TITLE_FONT= isWide and 16  or 14
 local BTN_H     = isWide and 38  or 32
 
--- ── MAIN PANEL (declared FIRST so toggle can reference it) ──
+-- MAIN PANEL
 local MF = Instance.new("Frame")
 MF.Size             = UDim2.new(0, PANEL_W, 0, PANEL_H)
 MF.Position         = UDim2.new(0.5, -PANEL_W/2, 0.5, -PANEL_H/2)
@@ -660,17 +608,15 @@ Instance.new("UICorner", MF).CornerRadius = UDim.new(0, 12)
 local mfStroke = Instance.new("UIStroke")
 mfStroke.Color=Color3.fromRGB(255,215,0) mfStroke.Thickness=1.5 mfStroke.Parent=MF
 
--- viewport rotation handler
 Cam:GetPropertyChangedSignal("ViewportSize"):Connect(function()
-    vp       = Cam.ViewportSize
-    isWide   = vp.X > 700
-    PANEL_W  = isWide and 380 or 270
-    PANEL_H  = isWide and 600 or 530
-    MF.Size  = UDim2.new(0, PANEL_W, 0, PANEL_H)
+    vp      = Cam.ViewportSize
+    isWide  = vp.X > 700
+    PANEL_W = isWide and 380 or 270
+    PANEL_H = isWide and 600 or 530
+    MF.Size = UDim2.new(0, PANEL_W, 0, PANEL_H)
 end)
 
 -- BACKGROUND IMAGE
--- FILL: swap with your direct image URL (.png/.jpg) or rbxassetid://NUMBER
 local BG_URL = "https://kommodo.ai/i/rEJQGF9mw7x6XTpPJChr"
 local bgImg = Instance.new("ImageLabel")
 bgImg.Size               = UDim2.new(1,0,1,0)
@@ -699,7 +645,7 @@ TL.ZIndex=7 TL.Parent=TB
 local SL = Instance.new("TextLabel")
 SL.Size=UDim2.new(1,-50,0,18) SL.Position=UDim2.new(0,10,0,30)
 SL.BackgroundTransparency=1
-SL.Text="Vagrant Survival | v5.2 | ADMIN: PRIMODAX"
+SL.Text="Vagrant Survival | v5.3 | ADMIN: PRIMODAX"
 SL.TextColor3=Color3.fromRGB(30,30,30) SL.TextSize=10
 SL.Font=Enum.Font.Gotham SL.TextXAlignment=Enum.TextXAlignment.Left
 SL.ZIndex=7 SL.Parent=TB
@@ -728,7 +674,146 @@ local Pad=Instance.new("UIPadding")
 Pad.PaddingTop=UDim.new(0,5) Pad.PaddingLeft=UDim.new(0,5)
 Pad.PaddingRight=UDim.new(0,5) Pad.Parent=SF
 
--- ── FLOATING CIRCLE TOGGLE (declared AFTER MF so it can reference it) ──
+-- ══════════════════════════════════════════════════════
+--  MENU BUILDER FUNCTIONS  ← THE FIX: defined before use
+-- ══════════════════════════════════════════════════════
+local toggleRefs = {}
+
+local function makeSection(label, order)
+    local f = Instance.new("Frame")
+    f.Size=UDim2.new(1,0,0,22) f.BackgroundColor3=Color3.fromRGB(255,215,0)
+    f.BackgroundTransparency=0.7 f.BorderSizePixel=0
+    f.LayoutOrder=order f.ZIndex=6 f.Parent=SF
+    Instance.new("UICorner",f).CornerRadius=UDim.new(0,4)
+    local lbl=Instance.new("TextLabel")
+    lbl.Size=UDim2.new(1,0,1,0) lbl.BackgroundTransparency=1
+    lbl.Text=label lbl.TextColor3=Color3.fromRGB(255,215,0)
+    lbl.TextSize=BASE_FONT lbl.Font=Enum.Font.GothamBold
+    lbl.ZIndex=7 lbl.Parent=f
+end
+
+local function makeToggle(label, cfgKey, order)
+    local row = Instance.new("Frame")
+    row.Size=UDim2.new(1,0,0,BTN_H) row.BackgroundColor3=Color3.fromRGB(22,22,22)
+    row.BorderSizePixel=0 row.LayoutOrder=order row.ZIndex=6 row.Parent=SF
+    Instance.new("UICorner",row).CornerRadius=UDim.new(0,6)
+
+    local lbl=Instance.new("TextLabel")
+    lbl.Size=UDim2.new(1,-56,1,0) lbl.Position=UDim2.new(0,10,0,0)
+    lbl.BackgroundTransparency=1 lbl.Text=label
+    lbl.TextColor3=Color3.fromRGB(220,220,220) lbl.TextSize=BASE_FONT
+    lbl.Font=Enum.Font.Gotham lbl.TextXAlignment=Enum.TextXAlignment.Left
+    lbl.ZIndex=7 lbl.Parent=row
+
+    local pill=Instance.new("Frame")
+    pill.Size=UDim2.new(0,40,0,22) pill.Position=UDim2.new(1,-48,0.5,-11)
+    pill.BorderSizePixel=0 pill.ZIndex=7 pill.Parent=row
+    Instance.new("UICorner",pill).CornerRadius=UDim.new(1,0)
+
+    local knob=Instance.new("Frame")
+    knob.Size=UDim2.new(0,18,0,18) knob.Position=UDim2.new(0,2,0.5,-9)
+    knob.BackgroundColor3=Color3.fromRGB(255,255,255) knob.BorderSizePixel=0
+    knob.ZIndex=8 knob.Parent=pill
+    Instance.new("UICorner",knob).CornerRadius=UDim.new(1,0)
+
+    local function refresh()
+        local on = CFG[cfgKey]
+        pill.BackgroundColor3 = on and Color3.fromRGB(80,200,80) or Color3.fromRGB(60,60,60)
+        knob.Position = on and UDim2.new(1,-20,0.5,-9) or UDim2.new(0,2,0.5,-9)
+    end
+    refresh()
+    table.insert(toggleRefs, refresh)
+
+    local btn=Instance.new("TextButton")
+    btn.Size=UDim2.new(1,0,1,0) btn.BackgroundTransparency=1
+    btn.Text="" btn.ZIndex=9 btn.Parent=row
+    btn.MouseButton1Click:Connect(function()
+        CFG[cfgKey] = not CFG[cfgKey]
+        refresh()
+    end)
+end
+
+local function makeSlider(label, cfgKey, minV, maxV, order)
+    local row=Instance.new("Frame")
+    row.Size=UDim2.new(1,0,0,BTN_H+12) row.BackgroundColor3=Color3.fromRGB(22,22,22)
+    row.BorderSizePixel=0 row.LayoutOrder=order row.ZIndex=6 row.Parent=SF
+    Instance.new("UICorner",row).CornerRadius=UDim.new(0,6)
+
+    local lbl=Instance.new("TextLabel")
+    lbl.Size=UDim2.new(1,-60,0,18) lbl.Position=UDim2.new(0,10,0,4)
+    lbl.BackgroundTransparency=1 lbl.Text=label
+    lbl.TextColor3=Color3.fromRGB(220,220,220) lbl.TextSize=BASE_FONT-1
+    lbl.Font=Enum.Font.Gotham lbl.TextXAlignment=Enum.TextXAlignment.Left
+    lbl.ZIndex=7 lbl.Parent=row
+
+    local valLbl=Instance.new("TextLabel")
+    valLbl.Size=UDim2.new(0,50,0,18) valLbl.Position=UDim2.new(1,-58,0,4)
+    valLbl.BackgroundTransparency=1 valLbl.Text=tostring(CFG[cfgKey])
+    valLbl.TextColor3=Color3.fromRGB(255,215,0) valLbl.TextSize=BASE_FONT-1
+    valLbl.Font=Enum.Font.GothamBold valLbl.TextXAlignment=Enum.TextXAlignment.Right
+    valLbl.ZIndex=7 valLbl.Parent=row
+
+    local track=Instance.new("Frame")
+    track.Size=UDim2.new(1,-20,0,6) track.Position=UDim2.new(0,10,1,-16)
+    track.BackgroundColor3=Color3.fromRGB(50,50,50) track.BorderSizePixel=0
+    track.ZIndex=7 track.Parent=row
+    Instance.new("UICorner",track).CornerRadius=UDim.new(1,0)
+
+    local fill=Instance.new("Frame")
+    fill.Size=UDim2.new((CFG[cfgKey]-minV)/(maxV-minV),0,1,0)
+    fill.BackgroundColor3=Color3.fromRGB(255,215,0) fill.BorderSizePixel=0
+    fill.ZIndex=8 fill.Parent=track
+    Instance.new("UICorner",fill).CornerRadius=UDim.new(1,0)
+
+    local thumb=Instance.new("TextButton")
+    thumb.Size=UDim2.new(0,16,0,16) thumb.BackgroundColor3=Color3.fromRGB(255,255,255)
+    thumb.Text="" thumb.BorderSizePixel=0 thumb.ZIndex=9
+    thumb.Position=UDim2.new((CFG[cfgKey]-minV)/(maxV-minV),0,0.5,-8)
+    thumb.Parent=track
+    Instance.new("UICorner",thumb).CornerRadius=UDim.new(1,0)
+
+    local dragging=false
+    local function updateVal(inputPos)
+        local trackAbs = track.AbsolutePosition
+        local trackSz  = track.AbsoluteSize
+        local rel = math.clamp((inputPos.X - trackAbs.X) / trackSz.X, 0, 1)
+        local val = math.floor(minV + rel*(maxV-minV) + 0.5)
+        CFG[cfgKey] = val
+        valLbl.Text  = tostring(val)
+        fill.Size    = UDim2.new(rel,0,1,0)
+        thumb.Position=UDim2.new(rel,0,0.5,-8)
+    end
+
+    thumb.InputBegan:Connect(function(inp)
+        if inp.UserInputType==Enum.UserInputType.MouseButton1
+        or inp.UserInputType==Enum.UserInputType.Touch then
+            dragging=true
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(inp)
+        if not dragging then return end
+        if inp.UserInputType==Enum.UserInputType.MouseMovement
+        or inp.UserInputType==Enum.UserInputType.Touch then
+            updateVal(inp.Position)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(inp)
+        if inp.UserInputType==Enum.UserInputType.MouseButton1
+        or inp.UserInputType==Enum.UserInputType.Touch then
+            dragging=false
+        end
+    end)
+    track.InputBegan:Connect(function(inp)
+        if inp.UserInputType==Enum.UserInputType.MouseButton1
+        or inp.UserInputType==Enum.UserInputType.Touch then
+            updateVal(inp.Position)
+        end
+    end)
+end
+
+-- ══════════════════════════════════════════════════════
+--  FLOATING CIRCLE TOGGLE
+-- ══════════════════════════════════════════════════════
 local toggleBtn = Instance.new("TextButton")
 toggleBtn.Size             = UDim2.new(0, 60, 0, 60)
 toggleBtn.Position         = UDim2.new(0.5, -30, 1, -95)
@@ -745,7 +830,6 @@ Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
 local tShadow = Instance.new("UIStroke")
 tShadow.Color=Color3.fromRGB(0,0,0) tShadow.Thickness=2 tShadow.Parent=toggleBtn
 
--- draggable + tap to toggle (MF now exists above, no nil reference)
 do
     local drag, dragStart, startPos, moved = false, nil, nil, false
     toggleBtn.InputBegan:Connect(function(inp)
@@ -771,15 +855,15 @@ do
         or inp.UserInputType==Enum.UserInputType.MouseButton1 then
             drag=false
             if not moved then
-                MF.Visible = not MF.Visible  -- MF exists here, no nil
+                MF.Visible = not MF.Visible
             end
         end
     end)
 end
 
--- ──────────────────────────────────────────────────────
---  MENU ITEMS
--- ──────────────────────────────────────────────────────
+-- ══════════════════════════════════════════════════════
+--  MENU ITEMS — called AFTER builder functions exist
+-- ══════════════════════════════════════════════════════
 makeSection("── COMBAT ──", 1)
 makeToggle("🎯 Silent Aim",        "SilentAim",      2)
 makeSlider("⭕ Silent Aim FOV",    "SilentAimFOV",   10, 500, 3)
@@ -854,4 +938,4 @@ cfgBtn("📥 Import",  Color3.fromRGB(80,40,120),  55, function()
     setStatus(ok and "✅ "..msg or "❌ "..msg)
 end)
 
-print("✅ PRIMODAXVGRANT v5.2 loaded — Vagrant Survival | ADMIN: PRIMODAX")
+print("✅ PRIMODAXVGRANT v5.3 loaded — Vagrant Survival | ADMIN: PRIMODAX")
