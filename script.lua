@@ -1,10 +1,11 @@
 -- ██████╗ ██████╗ ██╗███╗   ███╗ ██████╗ ██████╗  █████╗ ██╗  ██╗
 -- ██╔══██╗██╔══██╗██║████╗ ████║██╔═══██╗██╔══██╗██╔══██╗╚██╗██╔╝
--- ██████╔╝██████╔╝██║██╔████╔██║██║   ██║██║  ██║███████║ ╚███╔╝ 
--- ██╔═══╝ ██╔══██╗██║██║╚██╔╝██║██║   ██║██║  ██║██╔══██║ ██╔██╗ 
+-- ██████╔╝██████╔╝██║██╔████╔██║██║   ██║██║  ██║███████║ ╚███╔╝
+-- ██╔═══╝ ██╔══██╗██║██║╚██╔╝██║██║   ██║██║  ██║██╔══██║ ██╔██╗
 -- ██║     ██║  ██║██║██║ ╚═╝ ██║╚██████╔╝██████╔╝██║  ██║██╔╝ ██╗
 -- ╚═╝     ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
--- PRIMODAX VGRANT v6.4 | RELOAD FIX | AUTO RESPAWN (UI CLICK)
+-- PRIMODAX VGRANT v6.5 | CREATED BY: BOBOYTAGAAQUARIUS
+-- FIXED: Crossbow Reload, Mobile Inf Jump, Auto Sprint, Wide Screen FOV
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -15,6 +16,7 @@ local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
 local VirtualUser = game:GetService("VirtualUser")
 local TeleportService = game:GetService("TeleportService")
+local Lighting = game:GetService("Lighting")
 
 local LP = Players.LocalPlayer
 local Cam = Workspace.CurrentCamera
@@ -23,9 +25,10 @@ local Cam = Workspace.CurrentCamera
 local CFG = {
     SilentAim = false, Aimbot = false, AimbotSmoothing = 15, FOVRange = 120,
     SkipFriends = true, AutoRespawn = false, RespawnToBag = false,
-    InfiniteJump = false, Noclip = false, ESPEnabled = false,
-    AutoPickup = false, PickupPriority = "Random", AntiKick = true,
-    UnlimitedAmmo = false, AutoReload = false,
+    InfiniteJump = false, Noclip = false, AutoSprint = false, SprintSpeed = 30,
+    ESPEnabled = false, AutoPickup = false, PickupPriority = "Random", 
+    AntiKick = true, UnlimitedAmmo = false, AutoReload = false,
+    WideScreen = false, CameraFOV = 70,
 }
 
 -- ============ UTILS ============
@@ -34,6 +37,15 @@ local function getHum(p) local c = getChar(p) return c and c:FindFirstChildOfCla
 local function getRoot(p) local c = getChar(p) return c and c:FindFirstChild("HumanoidRootPart") end
 local function getPart(p, n) local c = getChar(p) return c and c:FindFirstChild(n) end
 local function isAlive(p) local h = getHum(p) return h and h.Health > 0 end
+
+-- ============ WIDE SCREEN (CAMERA FOV) ============
+local function updateCameraFOV()
+    if CFG.WideScreen then
+        Cam.FieldOfView = CFG.CameraFOV
+    else
+        Cam.FieldOfView = 70 -- Default Roblox FOV
+    end
+end
 
 -- ============ FOV CIRCLE ============
 local fovCircle = Drawing.new("Circle")
@@ -56,10 +68,7 @@ local function getTargetInFOV()
                     local screenPos, onScreen = Cam:WorldToViewportPoint(head.Position)
                     if onScreen then
                         local dist2D = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-                        if dist2D < bDist then
-                            bestTarget = p
-                            bDist = dist2D
-                        end
+                        if dist2D < bDist then bestTarget = p; bDist = dist2D end
                     end
                 end
             end
@@ -98,7 +107,7 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     return oldNamecall(self, table.unpack(args))
 end)
 
--- ============ AIMBOT ============
+-- ============ MAIN RENDER (AIMBOT & FOV) ============
 RunService.RenderStepped:Connect(function()
     fovCircle.Position = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
     fovCircle.Radius = CFG.FOVRange
@@ -154,7 +163,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ============ AMMO / RELOAD FIX ============
+-- ============ CROSSBOW & GUN RELOAD FIX ============
 RunService.Heartbeat:Connect(function()
     if not CFG.UnlimitedAmmo and not CFG.AutoReload then return end
     local char = getChar(LP)
@@ -162,28 +171,68 @@ RunService.Heartbeat:Connect(function()
     local tool = char:FindFirstChildOfClass("Tool")
     if not tool then return end
 
-    -- 1. Check Attributes
-    local ammoAttr = tool:GetAttribute("Ammo") or tool:GetAttribute("CurrentAmmo")
+    -- Check for Cooldown/Reload state attributes (Crossbow logic)
+    local reloading = tool:GetAttribute("Reloading") or tool:GetAttribute("IsReloading")
+    local ammoAttr = tool:GetAttribute("Ammo") or tool:GetAttribute("CurrentAmmo") or tool:GetAttribute("StoredAmmo")
+
+    if CFG.AutoReload and reloading == true then
+        tool:SetAttribute("Reloading", false)
+    end
+
     if CFG.UnlimitedAmmo and ammoAttr and type(ammoAttr) == "number" then
         if ammoAttr < 5 then tool:SetAttribute("Ammo", 999) end
     end
 
-    -- 2. Check values (IntValue / NumberValue)
+    -- Fallback for Value objects
     for _, v in ipairs(tool:GetDescendants()) do
         local n = v.Name:lower()
         if v:IsA("IntValue") or v:IsA("NumberValue") then
-            if CFG.UnlimitedAmmo and (n:find("ammo") or n:find("bullet") or n:find("mag")) then
+            if CFG.UnlimitedAmmo and (n:find("ammo") or n:find("bullet") or n:find("mag") or n:find("bolt")) then
                 if v.Value < 5 then v.Value = 999 end
             end
             if CFG.AutoReload and (n:find("reload") or n:find("reloading")) then
                 if v.Value == 1 then v.Value = 0 end
             end
         end
-        -- 3. Check BoolValue for reloading state
-        if v:IsA("BoolValue") and CFG.AutoReload then
-            if n:find("reload") or n:find("reloading") then
-                v.Value = false
+        if v:IsA("BoolValue") and CFG.AutoReload and (n:find("reload") or n:find("reloading")) then
+            v.Value = false
+        end
+    end
+end)
+
+-- ============ MOVEMENT (INF JUMP & SPRINT & NOCLIP) ============
+RunService.Heartbeat:Connect(function()
+    local char = getChar(LP)
+    if not char then return end
+    local hum = getHum(LP)
+    local root = getRoot(LP)
+    if not hum or not root then return end
+
+    -- Auto Sprint
+    if CFG.AutoSprint then
+        if hum.WalkSpeed < CFG.SprintSpeed then
+            hum.WalkSpeed = CFG.SprintSpeed
+        end
+    elseif hum.WalkSpeed == CFG.SprintSpeed then
+        hum.WalkSpeed = 16 -- Reset to default if turned off
+    end
+
+    -- Infinite Jump (Mobile Safe)
+    if CFG.InfiniteJump then
+        local jumpHeld = UserInputService:IsKeyDown(Enum.KeyCode.Space) or 
+                         UserInputService:IsKeyDown(Enum.KeyCode.ButtonA) or 
+                         (UserInputService.TouchEnabled and hum:GetState() == Enum.HumanoidStateType.Jumping)
+        if jumpHeld then
+            if hum:GetState() ~= Enum.HumanoidStateType.Jumping and hum:GetState() ~= Enum.HumanoidStateType.Freefall then
+                hum:ChangeState(Enum.HumanoidStateType.Jumping)
             end
+        end
+    end
+
+    -- Noclip
+    if CFG.Noclip then
+        for _, v in ipairs(char:GetDescendants()) do
+            if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then v.CanCollide = false end
         end
     end
 end)
@@ -191,8 +240,7 @@ end)
 -- ============ AUTO PICKUP ============
 RunService.Heartbeat:Connect(function()
     if not CFG.AutoPickup then return end
-    local root = getRoot(LP)
-    if not root then return end
+    local root = getRoot(LP) if not root then return end
     for _, obj in ipairs(Workspace:GetChildren()) do
         if (obj:IsA("Model") or obj:IsA("BasePart")) and obj ~= getChar(LP) then
             local part = obj:IsA("BasePart") and obj or obj:FindFirstChildOfClass("BasePart")
@@ -200,7 +248,7 @@ RunService.Heartbeat:Connect(function()
                 local name = obj.Name:lower()
                 local priority = false
                 if CFG.PickupPriority == "Random" then priority = true
-                elseif CFG.PickupPriority == "Guns" and (name:find("gun") or name:find("weapon")) then priority = true
+                elseif CFG.PickupPriority == "Guns" and (name:find("gun") or name:find("weapon") or name:find("crossbow")) then priority = true
                 elseif CFG.PickupPriority == "Heals" and (name:find("med") or name:find("kit")) then priority = true end
                 if priority then
                     for _, v in ipairs(obj:GetDescendants()) do
@@ -213,9 +261,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ============ AUTO RESPAWN (UI CLICK FIX) ============
--- Yung "Select" button sa screenshot mo ay isang TextButton sa CoreGui/PlayerGui.
--- I-scan natin at i-click natin yung button na 'yon.
+-- ============ AUTO RESPAWN ============
 local function clickRespawnUI()
     local guis = {CoreGui, LP:WaitForChild("PlayerGui")}
     for _, gui in ipairs(guis) do
@@ -223,11 +269,9 @@ local function clickRespawnUI()
             if obj:IsA("TextButton") then
                 local txt = obj.Text:lower()
                 local nm = obj.Name:lower()
-                if txt:find("select") or txt:find("respawn") or txt:find("spawn")
-                or nm:find("select") or nm:find("respawn") or nm:find("spawn") then
+                if txt:find("select") or txt:find("respawn") or txt:find("spawn") or nm:find("select") then
                     pcall(function() obj:Fire("MouseButton1Click") end)
                     pcall(function() obj:Activate() end)
-                    print("Respawn UI clicked:", obj.Name)
                 end
             end
         end
@@ -256,11 +300,7 @@ LP.CharacterAdded:Connect(function(char)
     if hum then
         hum.Died:Connect(function()
             if not CFG.AutoRespawn then return end
-            -- Loop hanggang makapasok sa laro
-            for i = 1, 15 do
-                task.wait(1)
-                clickRespawnUI()
-            end
+            for i = 1, 15 do task.wait(1); clickRespawnUI() end
             if CFG.RespawnToBag then
                 task.wait(1.5)
                 local newRoot = getRoot(LP)
@@ -268,29 +308,6 @@ LP.CharacterAdded:Connect(function(char)
                 if newRoot and bag then newRoot.CFrame = bag.CFrame + Vector3.new(0, 5, 0) end
             end
         end)
-    end
-end)
-
--- ============ INFINITE JUMP (MOBILE FIX) ============
-RunService.Heartbeat:Connect(function()
-    if not CFG.InfiniteJump then return end
-    local hum = getHum(LP)
-    if hum then
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) or UserInputService:IsKeyDown(Enum.KeyCode.ButtonA) then
-            hum:ChangeState(Enum.HumanoidStateType.Jumping)
-        end
-    end
-end)
-
--- ============ NOCLIP ============
-RunService.Stepped:Connect(function()
-    if CFG.Noclip then
-        local char = getChar(LP)
-        if char then
-            for _, v in ipairs(char:GetDescendants()) do
-                if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then v.CanCollide = false end
-            end
-        end
     end
 end)
 
@@ -303,8 +320,8 @@ SG.IgnoreGuiInset = true
 SG.Parent = CoreGui
 
 local MF = Instance.new("Frame")
-MF.Size = UDim2.fromOffset(300, 550)
-MF.Position = UDim2.new(0.5, -150, 0.5, -275)
+MF.Size = UDim2.fromOffset(300, 580)
+MF.Position = UDim2.new(0.5, -150, 0.5, -290)
 MF.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 MF.BorderSizePixel = 0
 MF.Visible = false
@@ -313,19 +330,24 @@ Instance.new("UICorner", MF).CornerRadius = UDim.new(0, 12)
 local mfStroke = Instance.new("UIStroke", MF); mfStroke.Color = Color3.fromRGB(255, 215, 0); mfStroke.Thickness = 1.5
 
 local TB = Instance.new("Frame")
-TB.Size = UDim2.new(1, 0, 0, 45); TB.BackgroundColor3 = Color3.fromRGB(255, 215, 0); TB.Parent = MF
+TB.Size = UDim2.new(1, 0, 0, 55); TB.BackgroundColor3 = Color3.fromRGB(255, 215, 0); TB.Parent = MF
 Instance.new("UICorner", TB).CornerRadius = UDim.new(0, 12)
+
 local TL = Instance.new("TextLabel")
-TL.Size = UDim2.new(1, -50, 1, 0); TL.Position = UDim2.new(0, 10, 0, 0); TL.BackgroundTransparency = 1
-TL.Text = "⚡ PRIMODAX V6.4 ⚡"; TL.TextColor3 = Color3.fromRGB(0, 0, 0); TL.TextSize = 15; TL.Font = Enum.Font.GothamBold; TL.TextXAlignment = Enum.TextXAlignment.Left; TL.Parent = TB
+TL.Size = UDim2.new(1, -50, 0, 30); TL.Position = UDim2.new(0, 10, 0, 5); TL.BackgroundTransparency = 1
+TL.Text = "⚡ PRIMODAX VGRANT ⚡"; TL.TextColor3 = Color3.fromRGB(0, 0, 0); TL.TextSize = 15; TL.Font = Enum.Font.GothamBold; TL.TextXAlignment = Enum.TextXAlignment.Left; TL.Parent = TB
+
+local SUB = Instance.new("TextLabel")
+SUB.Size = UDim2.new(1, -50, 0, 15); SUB.Position = UDim2.new(0, 10, 0, 28); SUB.BackgroundTransparency = 1
+SUB.Text = "Vagrant Survival v10 | By: BoboyTagaAquarius"; SUB.TextColor3 = Color3.fromRGB(30, 30, 30); SUB.TextSize = 10; SUB.Font = Enum.Font.Gotham; SUB.TextXAlignment = Enum.TextXAlignment.Left; SUB.Parent = TB
 
 local XBtn = Instance.new("TextButton")
-XBtn.Size = UDim2.new(0, 36, 0, 36); XBtn.Position = UDim2.new(1, -42, 0, 5); XBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30); XBtn.Text = "✕"; XBtn.TextColor3 = Color3.fromRGB(255, 215, 0); XBtn.TextSize = 16; XBtn.Font = Enum.Font.GothamBold; XBtn.Parent = TB
+XBtn.Size = UDim2.new(0, 36, 0, 36); XBtn.Position = UDim2.new(1, -42, 0, 10); XBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30); XBtn.Text = "✕"; XBtn.TextColor3 = Color3.fromRGB(255, 215, 0); XBtn.TextSize = 16; XBtn.Font = Enum.Font.GothamBold; XBtn.Parent = TB
 Instance.new("UICorner", XBtn).CornerRadius = UDim.new(1, 0)
 XBtn.MouseButton1Click:Connect(function() MF.Visible = false end)
 
 local SF = Instance.new("ScrollingFrame")
-SF.Size = UDim2.new(1, -10, 1, -50); SF.Position = UDim2.new(0, 5, 0, 50); SF.BackgroundTransparency = 1; SF.ScrollBarThickness = 3; SF.ScrollBarImageColor3 = Color3.fromRGB(255, 215, 0); SF.CanvasSize = UDim2.new(0, 0, 0, 0); SF.AutomaticCanvasSize = Enum.AutomaticSize.Y; SF.Parent = MF
+SF.Size = UDim2.new(1, -10, 1, -60); SF.Position = UDim2.new(0, 5, 0, 60); SF.BackgroundTransparency = 1; SF.ScrollBarThickness = 3; SF.ScrollBarImageColor3 = Color3.fromRGB(255, 215, 0); SF.CanvasSize = UDim2.new(0, 0, 0, 0); SF.AutomaticCanvasSize = Enum.AutomaticSize.Y; SF.Parent = MF
 local Layout = Instance.new("UIListLayout"); Layout.Padding = UDim.new(0, 6); Layout.SortOrder = Enum.SortOrder.LayoutOrder; Layout.Parent = SF
 local Pad = Instance.new("UIPadding"); Pad.PaddingTop = UDim.new(0, 8); Pad.PaddingBottom = UDim.new(0, 8); Pad.Parent = SF
 
@@ -340,7 +362,7 @@ local function makeToggle(name, key, order)
     update()
     btn.MouseButton1Click:Connect(function() CFG[key] = not CFG[key]; update() end)
 end
-local function makeSlider(name, key, min, max, order)
+local function makeSlider(name, key, min, max, order, callback)
     local frame = Instance.new("Frame"); frame.Size = UDim2.new(1, -10, 0, 38); frame.BackgroundTransparency = 1; frame.LayoutOrder = order; frame.Parent = SF
     local lbl = Instance.new("TextLabel"); lbl.Size = UDim2.new(1, 0, 0, 18); lbl.BackgroundTransparency = 1; lbl.Text = name .. ": " .. CFG[key]; lbl.TextColor3 = Color3.fromRGB(200, 200, 200); lbl.Font = Enum.Font.Gotham; lbl.TextSize = 11; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Parent = frame
     local bar = Instance.new("TextButton"); bar.Size = UDim2.new(1, 0, 0, 10); bar.Position = UDim2.new(0, 0, 0, 22); bar.BackgroundColor3 = Color3.fromRGB(40, 40, 40); bar.Text = ""; bar.Parent = frame
@@ -350,7 +372,13 @@ local function makeSlider(name, key, min, max, order)
     local dragging = false
     bar.MouseButton1Down:Connect(function() dragging = true end)
     UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging = false end end)
-    local function processInput(x) if not dragging then return end; local rel = math.clamp((x - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1); local val = math.floor(min + rel * (max - min)); CFG[key] = val; lbl.Text = name .. ": " .. val; fill.Size = UDim2.new(rel, 0, 1, 0) end
+    local function processInput(x) 
+        if not dragging then return end
+        local rel = math.clamp((x - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+        local val = math.floor(min + rel * (max - min))
+        CFG[key] = val; lbl.Text = name .. ": " .. val; fill.Size = UDim2.new(rel, 0, 1, 0)
+        if callback then callback() end
+    end
     bar.MouseMoved:Connect(function(x) processInput(x) end)
     UserInputService.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch then processInput(input.Position.X) end end)
 end
@@ -368,31 +396,25 @@ makeSlider("Aimbot Smooth", "AimbotSmoothing", 0, 100, 4)
 makeSlider("FOV Range", "FOVRange", 0, 360, 5)
 makeToggle("Skip Friends", "SkipFriends", 6)
 
-makeSection("WEAPONS (FIXED)", 10)
+makeSection("WEAPONS", 10)
 makeToggle("Unlimited Ammo", "UnlimitedAmmo", 11)
-makeToggle("Auto Reload", "AutoReload", 12)
-
-makeSection("LOOT", 15)
-makeToggle("Auto Pickup", "AutoPickup", 16)
-local prioBtn = Instance.new("TextButton")
-prioBtn.Size = UDim2.new(1, -10, 0, 32); prioBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40); prioBtn.Text = "Priority: " .. CFG.PickupPriority; prioBtn.TextColor3 = Color3.fromRGB(255, 255, 255); prioBtn.Font = Enum.Font.Gotham; prioBtn.TextSize = 12; prioBtn.LayoutOrder = 17; prioBtn.Parent = SF
-Instance.new("UICorner", prioBtn).CornerRadius = UDim.new(0, 6)
-prioBtn.MouseButton1Click:Connect(function()
-    local list = {"Random", "Guns", "Heals"}
-    for i, v in ipairs(list) do if CFG.PickupPriority == v then CFG.PickupPriority = list[i % #list + 1]; break end end
-    prioBtn.Text = "Priority: " .. CFG.PickupPriority
-end)
+makeToggle("Auto Reload (Crossbow Fix)", "AutoReload", 12)
 
 makeSection("MOVEMENT", 20)
 makeToggle("Infinite Jump", "InfiniteJump", 21)
-makeToggle("Noclip", "Noclip", 22)
+makeToggle("Auto Sprint", "AutoSprint", 22)
+makeSlider("Sprint Speed", "SprintSpeed", 16, 100, 23)
+makeToggle("Noclip", "Noclip", 24)
 
-makeSection("VISUAL", 30)
+makeSection("VISUAL & CAMERA", 30)
 makeToggle("ESP", "ESPEnabled", 31)
+makeToggle("Wide Screen (Ipad View)", "WideScreen", 32, updateCameraFOV)
+makeSlider("Camera FOV", "CameraFOV", 40, 120, 33, updateCameraFOV)
 
-makeSection("RESPAWN (UI FIX)", 40)
-makeToggle("Auto Respawn (Click UI)", "AutoRespawn", 41)
-makeToggle("Respawn to Bag", "RespawnToBag", 42)
+makeSection("LOOT & RESPAWN", 40)
+makeToggle("Auto Pickup", "AutoPickup", 41)
+makeToggle("Auto Respawn", "AutoRespawn", 42)
+makeToggle("Respawn to Bag", "RespawnToBag", 43)
 
 makeSection("SYSTEM", 50)
 makeButton("Server Hop", Color3.fromRGB(180, 80, 80), 51, function()
@@ -412,4 +434,4 @@ toggleBtn.InputBegan:Connect(function(input) if input.UserInputType == Enum.User
 UserInputService.InputChanged:Connect(function(input) if drag and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then local delta = input.Position - dragStart; toggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
 UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then drag = false; if startPos and math.abs(input.Position.X - dragStart.X) < 10 and math.abs(input.Position.Y - dragStart.Y) < 10 then MF.Visible = not MF.Visible end end end)
 
-print("✅ PRIMODAX V6.4 Loaded — Ammo Fix, Auto Respawn UI Fix")
+print("✅ PRIMODAX v6.5 Loaded — Created by BoboyTagaAquarius")
