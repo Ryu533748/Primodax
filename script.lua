@@ -4,7 +4,7 @@
 -- ██╔═══╝ ██╔══██╗██║██║╚██╔╝██║██║   ██║██║  ██║██╔══██║ ██╔██╗
 -- ██║     ██║  ██║██║██║ ╚═╝ ██║╚██████╔╝██████╔╝██║  ██║██╔╝ ██╗
 -- ╚═╝     ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
--- PRIMODAX VGRANT v6.6 | ANTI-KICK FIX | FORCE RELOAD
+-- PRIMODAX VGRANT v6.7 | FINAL FIX: Crossbow, Fly Jump, Bag TP
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -23,7 +23,7 @@ local Cam = Workspace.CurrentCamera
 local CFG = {
     SilentAim = false, Aimbot = false, AimbotSmoothing = 15, FOVRange = 120,
     SkipFriends = true, AutoRespawn = false, RespawnToBag = false,
-    InfiniteJump = false, AutoSprint = false, SprintSpeed = 20, -- MAX 20 to 22 lang para di ma-kick
+    InfiniteJump = false, AutoSprint = false, SprintSpeed = 20,
     ESPEnabled = false, AutoPickup = false, PickupPriority = "Random", 
     AntiKick = true, UnlimitedAmmo = false, AutoReload = false,
     WideScreen = false, CameraFOV = 70,
@@ -38,11 +38,7 @@ local function isAlive(p) local h = getHum(p) return h and h.Health > 0 end
 
 -- ============ WIDE SCREEN (CAMERA FOV) ============
 local function updateCameraFOV()
-    if CFG.WideScreen then
-        Cam.FieldOfView = CFG.CameraFOV
-    else
-        Cam.FieldOfView = 70
-    end
+    if CFG.WideScreen then Cam.FieldOfView = CFG.CameraFOV else Cam.FieldOfView = 70 end
 end
 
 -- ============ FOV CIRCLE ============
@@ -105,7 +101,7 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     return oldNamecall(self, table.unpack(args))
 end)
 
--- ============ MAIN RENDER (AIMBOT & FOV) ============
+-- ============ MAIN RENDER ============
 RunService.RenderStepped:Connect(function()
     fovCircle.Position = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
     fovCircle.Radius = CFG.FOVRange
@@ -161,70 +157,75 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ============ FORCE RELOAD & INFINITE AMMO ============
--- Ang Crossbow ay may "Draw Time". Para ma-force reload, i-unequip at i-equip natin nang mabilis.
-local lastReloadTime = 0
+-- ============ WEAPON FORCE RELOAD FIX (V6.7) ============
+local lastReloadAttempt = 0
 RunService.Heartbeat:Connect(function()
     if not CFG.UnlimitedAmmo and not CFG.AutoReload then return end
     local char = getChar(LP)
     if not char then return end
     local tool = char:FindFirstChildOfClass("Tool")
     if not tool then return end
-    local hum = getHum(LP)
-    if not hum then return end
 
-    -- Force Auto Reload (Crossbow Fix)
-    if CFG.AutoReload and tick() - lastReloadTime > 1.5 then
-        local isReloading = tool:GetAttribute("Reloading") or tool:GetAttribute("IsReloading")
-        local ammo = tool:GetAttribute("Ammo") or tool:GetAttribute("CurrentAmmo") or tool:GetAttribute("StoredAmmo")
-        
-        -- Kung kulang sa bala o nagre-reload state, pilitin i-refresh
-        if isReloading == true or (ammo and ammo == 0) then
-            hum:UnequipTools()
-            task.wait(0.1)
-            hum:EquipTool(tool)
-            lastReloadTime = tick()
+    -- Infinite Ammo Logic (Attributes & Values)
+    if CFG.UnlimitedAmmo then
+        local ammoAttr = tool:GetAttribute("Ammo") or tool:GetAttribute("CurrentAmmo") or tool:GetAttribute("StoredAmmo")
+        if ammoAttr and type(ammoAttr) == "number" and ammoAttr < 5 then
+            tool:SetAttribute("Ammo", 999)
+            tool:SetAttribute("CurrentAmmo", 999)
+            tool:SetAttribute("StoredAmmo", 999)
+        end
+        for _, v in ipairs(tool:GetDescendants()) do
+            local n = v.Name:lower()
+            if (v:IsA("IntValue") or v:IsA("NumberValue")) and (n:find("ammo") or n:find("bullet") or n:find("mag") or n:find("bolt")) then
+                if v.Value < 5 then v.Value = 999 end
+            end
         end
     end
 
-    -- Infinite Ammo (Fallback sa Values)
-    if CFG.UnlimitedAmmo then
-        for _, v in ipairs(tool:GetDescendants()) do
-            local n = v.Name:lower()
-            if v:IsA("IntValue") or v:IsA("NumberValue") then
-                if n:find("ammo") or n:find("bullet") or n:find("mag") or n:find("bolt") then
-                    if v.Value < 5 then v.Value = 999 end
-                end
+    -- Auto Reload (Crossbow) - Pilitin i-activate ang tool
+    if CFG.AutoReload and tick() - lastReloadAttempt > 1 then
+        local isReloading = tool:GetAttribute("Reloading") or tool:GetAttribute("IsReloading")
+        local currentAmmo = tool:GetAttribute("Ammo") or tool:GetAttribute("CurrentAmmo")
+        
+        -- Kapag kulang sa bala o nagre-reload, i-activate natin ang tool (parang pinindot mo yung screen)
+        if isReloading == true or (currentAmmo and currentAmmo <= 0) then
+            pcall(function() tool:Activate() end)
+            -- Fallback: I-unequip at i-equip para mag-reset
+            local hum = getHum(LP)
+            if hum then
+                hum:UnequipTools()
+                task.wait(0.1)
+                hum:EquipTool(tool)
             end
+            lastReloadAttempt = tick()
         end
     end
 end)
 
--- ============ MOVEMENT (INF JUMP & SPRINT) ============
+-- ============ MOVEMENT (INF JUMP FLY FIX) ============
 RunService.Heartbeat:Connect(function()
     local char = getChar(LP)
     if not char then return end
     local hum = getHum(LP)
-    if not hum then return end
+    local root = getRoot(LP)
+    if not hum or not root then return end
 
-    -- Auto Sprint (Safe Speed 20-22)
+    -- Auto Sprint
     if CFG.AutoSprint then
-        if hum.WalkSpeed < CFG.SprintSpeed then
-            hum.WalkSpeed = CFG.SprintSpeed
-        end
+        if hum.WalkSpeed < CFG.SprintSpeed then hum.WalkSpeed = CFG.SprintSpeed end
     elseif hum.WalkSpeed == CFG.SprintSpeed then
-        hum.WalkSpeed = 16 -- Reset sa default
+        hum.WalkSpeed = 16
     end
 
-    -- Infinite Jump
+    -- Infinite Jump (Velocity Injection para talagang lilipad)
     if CFG.InfiniteJump then
-        local jumpHeld = UserInputService:IsKeyDown(Enum.KeyCode.Space) or 
-                         UserInputService:IsKeyDown(Enum.KeyCode.ButtonA) or 
-                         (UserInputService.TouchEnabled and hum:GetState() == Enum.HumanoidStateType.Jumping)
-        if jumpHeld then
-            if hum:GetState() ~= Enum.HumanoidStateType.Jumping and hum:GetState() ~= Enum.HumanoidStateType.Freefall then
-                hum:ChangeState(Enum.HumanoidStateType.Jumping)
-            end
+        local isJumping = UserInputService:IsKeyDown(Enum.KeyCode.Space) or 
+                          UserInputService:IsKeyDown(Enum.KeyCode.ButtonA) or
+                          (UserInputService.TouchEnabled and hum:GetState() == Enum.HumanoidStateType.Jumping)
+        
+        if isJumping then
+            -- Direktang dagdagan ang Y velocity para pataas nang pataas
+            root.Velocity = Vector3.new(root.Velocity.X, 50, root.Velocity.Z)
         end
     end
 end)
@@ -253,15 +254,14 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ============ AUTO RESPAWN ============
+-- ============ AUTO RESPAWN & OWN BAG TELEPORT (V6.7 FIX) ============
 local function clickRespawnUI()
     local guis = {CoreGui, LP:WaitForChild("PlayerGui")}
     for _, gui in ipairs(guis) do
         for _, obj in ipairs(gui:GetDescendants()) do
             if obj:IsA("TextButton") then
                 local txt = obj.Text:lower()
-                local nm = obj.Name:lower()
-                if txt:find("select") or txt:find("respawn") or txt:find("spawn") or nm:find("select") then
+                if txt:find("select") or txt:find("respawn") or txt:find("spawn") then
                     pcall(function() obj:Fire("MouseButton1Click") end)
                     pcall(function() obj:Activate() end)
                 end
@@ -270,21 +270,22 @@ local function clickRespawnUI()
     end
 end
 
-local function findOwnBag()
-    local root = getRoot(LP) if not root then return nil end
-    local best, bDist = nil, 300
-    local lname = LP.Name:lower()
-    for _, obj in ipairs(Workspace:GetChildren()) do
+local function findMyBag()
+    -- Mas malalim na paghahanap: ini-scan pati loob ng Models/Folders sa buong Workspace
+    local myName = LP.Name:lower()
+    local myId = tostring(LP.UserId)
+    
+    for _, obj in ipairs(Workspace:GetDescendants()) do
         local n = obj.Name:lower()
-        if n:find("bag") or n:find(lname) then
+        -- Kung may pangalan mo, o may UserId mo, o "bag" na malapit sayo
+        if n:find(myName) or n:find(myId) or n:find("bag") or n:find("loot_drop") then
             local part = obj:IsA("BasePart") and obj or obj:FindFirstChildOfClass("BasePart")
-            if part then
-                local d = (root.Position - part.Position).Magnitude
-                if d < bDist then best = part; bDist = d end
+            if part and part.Position.Magnitude > 0 then -- valid position
+                return part
             end
         end
     end
-    return best
+    return nil
 end
 
 LP.CharacterAdded:Connect(function(char)
@@ -292,12 +293,19 @@ LP.CharacterAdded:Connect(function(char)
     if hum then
         hum.Died:Connect(function()
             if not CFG.AutoRespawn then return end
+            
+            -- 1. Auto Click Respawn UI
             for i = 1, 15 do task.wait(1); clickRespawnUI() end
+            
+            -- 2. Teleport to Own Bag
             if CFG.RespawnToBag then
-                task.wait(1.5)
+                task.wait(2) -- Hintayin mag-load ang character
                 local newRoot = getRoot(LP)
-                local bag = findOwnBag()
-                if newRoot and bag then newRoot.CFrame = bag.CFrame + Vector3.new(0, 5, 0) end
+                local myBag = findMyBag()
+                if newRoot and myBag then 
+                    newRoot.CFrame = myBag.CFrame + Vector3.new(0, 5, 0) 
+                    print("Teleported to bag:", myBag:GetFullName())
+                end
             end
         end)
     end
@@ -341,7 +349,7 @@ XBtn.MouseButton1Click:Connect(function() MF.Visible = false end)
 local SF = Instance.new("ScrollingFrame")
 SF.Size = UDim2.new(1, -10, 1, -60); SF.Position = UDim2.new(0, 5, 0, 60); SF.BackgroundTransparency = 1; SF.ScrollBarThickness = 3; SF.ScrollBarImageColor3 = Color3.fromRGB(255, 215, 0); SF.CanvasSize = UDim2.new(0, 0, 0, 0); SF.AutomaticCanvasSize = Enum.AutomaticSize.Y; SF.Parent = MF
 local Layout = Instance.new("UIListLayout"); Layout.Padding = UDim.new(0, 6); Layout.SortOrder = Enum.SortOrder.LayoutOrder; Layout.Parent = SF
-local Pad = Instance.new("UIPadding"); Pad.PaddingTop = UDim.new(0, 8); Pad.PaddingBottom = UDim.new(0, 8); Pad.Parent = SF
+local Pad = Instance.new("UIPadding"); PaddingTop = UDim.new(0, 8); Pad.PaddingBottom = UDim.new(0, 8); Pad.Parent = SF
 
 -- UI Helpers
 local function makeSection(text, order)
@@ -393,7 +401,7 @@ makeToggle("Unlimited Ammo", "UnlimitedAmmo", 11)
 makeToggle("Force Reload (Crossbow)", "AutoReload", 12)
 
 makeSection("MOVEMENT", 20)
-makeToggle("Infinite Jump", "InfiniteJump", 21)
+makeToggle("Infinite Jump (Fly)", "InfiniteJump", 21)
 makeToggle("Auto Sprint (Safe)", "AutoSprint", 22)
 makeSlider("Sprint Speed (Max 22)", "SprintSpeed", 16, 22, 23)
 
@@ -425,4 +433,4 @@ toggleBtn.InputBegan:Connect(function(input) if input.UserInputType == Enum.User
 UserInputService.InputChanged:Connect(function(input) if drag and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then local delta = input.Position - dragStart; toggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
 UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then drag = false; if startPos and math.abs(input.Position.X - dragStart.X) < 10 and math.abs(input.Position.Y - dragStart.Y) < 10 then MF.Visible = not MF.Visible end end end)
 
-print("✅ PRIMODAX v6.6 Loaded — Safe Speed, Force Reload Activated")
+print("✅ PRIMODAX v6.7 Loaded — Final Fix")
