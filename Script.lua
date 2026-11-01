@@ -468,3 +468,41 @@ makeToggle("📦 Respawn @ Loot",  "AutoRespawnLoot", 9)
 makeToggle("⭕ Show FOV",        "ShowFOV",         10)
 
 print("✅ PRIMODAXVGRANT loaded — Vagrant Survival | v1.0")
+
+-- ══════════════════════════════════════════
+-- PRIMODAXVGRANT BYPASS v1.0
+-- ══════════════════════════════════════════
+
+pcall(function()
+
+    -- Block kick/ban/anticheat remotes
+    local oldBypass
+    oldBypass = hookmetamethod(game, "__namecall", function(self, ...)
+        local method = getnamecallmethod()
+        if method == "FireServer" or method == "InvokeServer" then
+            local name = self.Name:lower()
+            if name:find("kick")
+            or name:find("ban")
+            or name:find("anticheat")
+            or name:find("detect")
+            or name:find("report") then
+                return nil
+            end
+        end
+        return oldBypass(self, table.unpack({...}))
+    end)
+
+    -- Hide executor globals
+    local mt = getrawmetatable(game)
+    setreadonly(mt, false)
+    local oldIndex = mt.__index
+    mt.__index = newcclosure(function(self, key)
+        if key == "Executor" or key == "executor" then
+            return nil
+        end
+        return oldIndex(self, key)
+    end)
+    setreadonly(mt, true)
+
+    print("[Primodaxvgrant] Bypass active ✅")
+end)
