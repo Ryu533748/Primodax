@@ -4,7 +4,7 @@
 -- ██╔═══╝ ██╔══██╗██║██║╚██╔╝██║██║   ██║██║  ██║██╔══██║ ██╔██╗
 -- ██║     ██║  ██║██║██║ ╚═╝ ██║╚██████╔╝██████╔╝██║  ██║██╔╝ ██╗
 -- ╚═╝     ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
--- PRIMODAX VGRANT v7.0 | LANDSCAPE + BG IMAGE | Created By: BoboyTagaAquarius
+-- PRIMODAX VGRANT v7.1 | GODMODE | FLY JUMP | BG FIXED
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -13,7 +13,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
-local VirtualUser = game:GetService("VirtualUser")
 local TeleportService = game:GetService("TeleportService")
 
 local LP = Players.LocalPlayer
@@ -26,7 +25,7 @@ local CFG = {
     InfiniteJump = false, AutoSprint = false, SprintSpeed = 20,
     ESPEnabled = false, AutoPickup = false, PickupPriority = "Random", 
     AntiKick = true, UnlimitedAmmo = false, AutoReload = false,
-    WideScreen = false, CameraFOV = 70,
+    WideScreen = false, CameraFOV = 70, GodMode = false
 }
 
 -- ============ UTILS ============
@@ -35,6 +34,21 @@ local function getHum(p) local c = getChar(p) return c and c:FindFirstChildOfCla
 local function getRoot(p) local c = getChar(p) return c and c:FindFirstChild("HumanoidRootPart") end
 local function getPart(p, n) local c = getChar(p) return c and c:FindFirstChild(n) end
 local function isAlive(p) local h = getHum(p) return h and h.Health > 0 end
+
+-- ============ GODMODE ============
+RunService.Heartbeat:Connect(function()
+    if not CFG.GodMode then return end
+    local hum = getHum(LP)
+    if hum then
+        if hum.Health < hum.MaxHealth then
+            hum.Health = hum.MaxHealth
+        end
+        -- Pwersahang i-lock ang health
+        if hum.Health <= 0 then
+            hum.Health = 100
+        end
+    end
+end)
 
 -- ============ WIDE SCREEN ============
 local function updateCameraFOV()
@@ -157,7 +171,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ============ V6.2 RELOAD LOGIC ============
+-- ============ V6.2 RELOAD + AUTO FIRE ============
 RunService.Heartbeat:Connect(function()
     if not CFG.UnlimitedAmmo and not CFG.AutoReload then return end
     local char = getChar(LP) if not char then return end
@@ -179,9 +193,13 @@ RunService.Heartbeat:Connect(function()
             end
         end
     end
+    -- Force Reload pagnauubos
+    if CFG.AutoReload and tool:GetAttribute("Reloading") then
+        task.spawn(function() tool:Activate() end)
+    end
 end)
 
--- ============ MOVEMENT (INF JUMP FLY) ============
+-- ============ MOVEMENT (FLY JUMP) ============
 RunService.Heartbeat:Connect(function()
     local char = getChar(LP)
     if not char then return end
@@ -195,12 +213,14 @@ RunService.Heartbeat:Connect(function()
         hum.WalkSpeed = 16
     end
 
+    -- Infinite Jump (Fly Jump)
     if CFG.InfiniteJump then
         local isJumping = UserInputService:IsKeyDown(Enum.KeyCode.Space) or 
                           UserInputService:IsKeyDown(Enum.KeyCode.ButtonA) or
                           (UserInputService.TouchEnabled and hum:GetState() == Enum.HumanoidStateType.Jumping)
         if isJumping then
-            root.Velocity = Vector3.new(root.Velocity.X, 50, root.Velocity.Z)
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+            root.Velocity = Vector3.new(root.Velocity.X, 60, root.Velocity.Z)
         end
     end
 end)
@@ -293,7 +313,7 @@ MF.Parent = SG
 Instance.new("UICorner", MF).CornerRadius = UDim.new(0, 12)
 local mfStroke = Instance.new("UIStroke", MF); mfStroke.Color = Color3.fromRGB(255, 215, 0); mfStroke.Thickness = 1.5
 
--- Background Image (ID: 118004643139453)
+-- Background Image
 local bgImg = Instance.new("ImageLabel")
 bgImg.Size = UDim2.new(1, 0, 1, 0)
 bgImg.Position = UDim2.new(0, 0, 0, 0)
@@ -301,14 +321,15 @@ bgImg.BackgroundTransparency = 1
 bgImg.Image = "rbxassetid://118004643139453" 
 bgImg.ScaleType = Enum.ScaleType.Crop
 bgImg.ZIndex = 1
+bgImg.ImageTransparency = 0 -- 0 = Full Visibility
 bgImg.Parent = MF
 Instance.new("UICorner", bgImg).CornerRadius = UDim.new(0, 12)
 
--- Dark Overlay
+-- Dark Overlay (Para mabasa yung text)
 local overlay = Instance.new("Frame")
 overlay.Size = UDim2.new(1, 0, 1, 0)
 overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-overlay.BackgroundTransparency = 0.65 
+overlay.BackgroundTransparency = 0.6 
 overlay.ZIndex = 2
 overlay.Parent = MF
 Instance.new("UICorner", overlay).CornerRadius = UDim.new(0, 12)
@@ -413,13 +434,14 @@ makeToggle("Wide Screen", "WideScreen", 12, LeftCol, updateCameraFOV)
 makeSlider("Camera FOV", "CameraFOV", 40, 120, 13, LeftCol, updateCameraFOV)
 
 makeSection("MOVEMENT", 20, LeftCol)
-makeToggle("Infinite Jump", "InfiniteJump", 21, LeftCol)
+makeToggle("Infinite Jump (Fly)", "InfiniteJump", 21, LeftCol)
 makeToggle("Auto Sprint (Safe)", "AutoSprint", 22, LeftCol)
 makeSlider("Sprint Speed (Max 22)", "SprintSpeed", 16, 22, 23, LeftCol)
+makeToggle("GodMode (Semi-God)", "GodMode", 24, LeftCol)
 
 makeSection("WEAPONS", 1, RightCol)
 makeToggle("Unlimited Ammo", "UnlimitedAmmo", 2, RightCol)
-makeToggle("Auto Reload", "AutoReload", 3, RightCol)
+makeToggle("Auto Reload (Spam Fire)", "AutoReload", 3, RightCol)
 
 makeSection("LOOT & PICKUP", 10, RightCol)
 makeToggle("Auto Pickup", "AutoPickup", 11, RightCol)
@@ -450,8 +472,3 @@ toggleBtn.Size = UDim2.fromOffset(60, 60); toggleBtn.Position = UDim2.new(0.5, -
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
 
 local drag, dragStart, startPos = false, nil, nil
-toggleBtn.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then drag = true; dragStart = input.Position; startPos = toggleBtn.Position end end)
-UserInputService.InputChanged:Connect(function(input) if drag and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then local delta = input.Position - dragStart; toggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
-UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then drag = false; if startPos and math.abs(input.Position.X - dragStart.X) < 10 and math.abs(input.Position.Y - dragStart.Y) < 10 then MF.Visible = not MF.Visible end end end)
-
-print("✅ PRIMODAX v7.0 Loaded — Solo Leveling BG Applied")
