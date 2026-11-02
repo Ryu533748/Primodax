@@ -176,7 +176,7 @@ RunService.Heartbeat:Connect(function()
     end
     if CFG.ItemESP then
         for _, obj in ipairs(Workspace:GetDescendants()) do
-            if isTargetLoot(obj) then
+            if isTargetLoot(obj) and obj:IsA("BasePart") then
                 createESP(obj, Color3.fromRGB(50,255,50))
             end
         end
@@ -245,7 +245,7 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ════════════════════════════════════════
---              GUI
+--              GUI (LANDSCAPE FIX)
 -- ════════════════════════════════════════
 local ACCENT  = Color3.fromRGB(255,105,180)
 local BG_DARK = Color3.fromRGB(18,18,18)
@@ -254,25 +254,29 @@ local BG_MID  = Color3.fromRGB(30,30,30)
 local TXT     = Color3.fromRGB(220,220,220)
 local TXT_DIM = Color3.fromRGB(130,130,130)
 
+local parentGui = gethui and gethui() or CoreGui
+if parentGui:FindFirstChild("PrimoDaxLTF") then parentGui:FindFirstChild("PrimoDaxLTF"):Destroy() end
+
 local Gui = Instance.new("ScreenGui")
 Gui.Name           = "PrimoDaxLTF"
 Gui.ResetOnSpawn   = false
 Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-Gui.Parent         = CoreGui
+Gui.Parent         = parentGui
+if protect_gui then pcall(protect_gui, Gui) end
 
 local Main = Instance.new("Frame")
 Main.Name             = "Main"
-Main.Size             = UDim2.new(0,340,0,500)
-Main.Position         = UDim2.new(0.5,-170,0.5,-250)
+-- Landscape size
+Main.Size             = UDim2.new(0, 550, 0, 320)
+Main.Position         = UDim2.new(0.5,-275,0.5,-160)
 Main.BackgroundColor3 = BG_DARK
 Main.BorderSizePixel  = 0
 Main.Active           = true
-Main.Draggable        = true
 Main.Parent           = Gui
 Instance.new("UICorner",Main).CornerRadius = UDim.new(0,8)
 
 local TBar = Instance.new("Frame")
-TBar.Size             = UDim2.new(1,0,0,40)
+TBar.Size             = UDim2.new(1,0,0,35)
 TBar.BackgroundColor3 = BG_MID
 TBar.BorderSizePixel  = 0
 TBar.Parent           = Main
@@ -281,10 +285,10 @@ Instance.new("UICorner",TBar).CornerRadius = UDim.new(0,8)
 local TLbl = Instance.new("TextLabel")
 TLbl.Text           = "PrimoDax Hub"
 TLbl.Font           = Enum.Font.GothamBold
-TLbl.TextSize       = 15
+TLbl.TextSize       = 14
 TLbl.TextColor3     = Color3.fromRGB(255,255,255)
-TLbl.Size           = UDim2.new(1,-80,0,22)
-TLbl.Position       = UDim2.new(0,12,0,4)
+TLbl.Size           = UDim2.new(1,-80,0,20)
+TLbl.Position       = UDim2.new(0,12,0,2)
 TLbl.BackgroundTransparency = 1
 TLbl.TextXAlignment = Enum.TextXAlignment.Left
 TLbl.Parent         = TBar
@@ -294,8 +298,8 @@ CLbl.Text           = "Created By: BoboyTagaAquarius"
 CLbl.Font           = Enum.Font.Gotham
 CLbl.TextSize       = 9
 CLbl.TextColor3     = TXT_DIM
-CLbl.Size           = UDim2.new(1,-80,0,14)
-CLbl.Position       = UDim2.new(0,12,0,24)
+CLbl.Size           = UDim2.new(1,-80,0,12)
+CLbl.Position       = UDim2.new(0,12,0,20)
 CLbl.BackgroundTransparency = 1
 CLbl.TextXAlignment = Enum.TextXAlignment.Left
 CLbl.Parent         = TBar
@@ -306,32 +310,28 @@ XBtn.Font             = Enum.Font.GothamBold
 XBtn.TextSize         = 13
 XBtn.TextColor3       = Color3.fromRGB(255,80,80)
 XBtn.Size             = UDim2.new(0,26,0,26)
-XBtn.Position         = UDim2.new(1,-30,0,7)
+XBtn.Position         = UDim2.new(1,-30,0,4)
 XBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
 XBtn.BorderSizePixel  = 0
 XBtn.Parent           = TBar
 Instance.new("UICorner",XBtn).CornerRadius = UDim.new(0,6)
 XBtn.MouseButton1Click:Connect(function() Gui:Destroy() end)
 
-local TabBar = Instance.new("Frame")
-TabBar.Size             = UDim2.new(1,0,0,30)
-TabBar.Position         = UDim2.new(0,0,0,40)
-TabBar.BackgroundColor3 = Color3.fromRGB(22,22,22)
-TabBar.BorderSizePixel  = 0
-TabBar.Parent           = Main
-local TL = Instance.new("UIListLayout",TabBar)
-TL.FillDirection = Enum.FillDirection.Horizontal
-TL.Padding       = UDim.new(0,2)
-local TP = Instance.new("UIPadding",TabBar)
-TP.PaddingLeft = UDim.new(0,4)
-TP.PaddingTop  = UDim.new(0,3)
+-- Sidebar instead of top tabs
+local Sidebar = Instance.new("Frame")
+Sidebar.Size             = UDim2.new(0,100,1,-35)
+Sidebar.Position         = UDim2.new(0,0,0,35)
+Sidebar.BackgroundColor3 = BG_MID
+Sidebar.BorderSizePixel  = 0
+Sidebar.Parent           = Main
 
 local Scroll = Instance.new("ScrollingFrame")
-Scroll.Size                = UDim2.new(1,0,1,-98)
-Scroll.Position            = UDim2.new(0,0,0,70)
+Scroll.Size                = UDim2.new(1,-105,1,-40)
+Scroll.Position            = UDim2.new(0,100,0,35)
 Scroll.BackgroundColor3    = BG_DARK
 Scroll.BorderSizePixel     = 0
-Scroll.ScrollBarThickness  = 4
+Scroll.ScrollBarThickness  = 2
+Scroll.ScrollBarImageColor3 = ACCENT
 Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 Scroll.CanvasSize          = UDim2.new(0,0,0,0)
 Scroll.Parent              = Main
@@ -343,24 +343,6 @@ SP.PaddingRight  = UDim.new(0,8)
 SP.PaddingTop    = UDim.new(0,6)
 SP.PaddingBottom = UDim.new(0,6)
 
--- Discord footer
-local DBar = Instance.new("Frame")
-DBar.Size             = UDim2.new(1,0,0,28)
-DBar.Position         = UDim2.new(0,0,1,-28)
-DBar.BackgroundColor3 = Color3.fromRGB(24,24,24)
-DBar.BorderSizePixel  = 0
-DBar.Parent           = Main
-
-local DLbl = Instance.new("TextLabel")
-DLbl.Text             = "Join our Discord! discord.gg/krvsuC9jy"
-DLbl.Font             = Enum.Font.Gotham
-DLbl.TextSize         = 10
-DLbl.TextColor3       = Color3.fromRGB(130,130,255)
-DLbl.Size             = UDim2.new(1,0,1,0)
-DLbl.BackgroundTransparency = 1
-DLbl.TextXAlignment   = Enum.TextXAlignment.Center
-DLbl.Parent           = DBar
-
 -- ════════════════════════════════════════
 --         UI HELPERS
 -- ════════════════════════════════════════
@@ -370,14 +352,14 @@ local tabBtns   = {}
 local function mkTab(name, order)
     local btn = Instance.new("TextButton")
     btn.Text             = name
-    btn.Font             = Enum.Font.GothamSemibold
-    btn.TextSize         = 10
+    btn.Font             = Enum.Font.GothamBold
+    btn.TextSize         = 11
     btn.TextColor3       = TXT_DIM
-    btn.Size             = UDim2.new(0,52,0,24)
+    btn.Size             = UDim2.new(1,-10,0,28)
+    btn.Position         = UDim2.new(0,5,0,5 + (order * 32))
     btn.BackgroundColor3 = BG_MID
     btn.BorderSizePixel  = 0
-    btn.LayoutOrder      = order
-    btn.Parent           = TabBar
+    btn.Parent           = Sidebar
     Instance.new("UICorner",btn).CornerRadius = UDim.new(0,4)
 
     local frame = Instance.new("Frame")
@@ -420,7 +402,7 @@ end
 
 local function mkLbl(parent, text, order)
     local l = Instance.new("TextLabel")
-    l.Text = text; l.Font = Enum.Font.GothamSemibold; l.TextSize = 12
+    l.Text = text; l.Font = Enum.Font.GothamBold; l.TextSize = 12
     l.TextColor3 = TXT; l.Size = UDim2.new(1,0,0,18)
     l.BackgroundTransparency = 1
     l.TextXAlignment = Enum.TextXAlignment.Left
@@ -430,7 +412,7 @@ end
 
 local function mkSub(parent, text, order)
     local l = mkLbl(parent, text, order)
-    l.TextSize = 10; l.TextColor3 = TXT_DIM
+    l.TextSize = 10; l.TextColor3 = TXT_DIM; l.Font = Enum.Font.Gotham
     return l
 end
 
@@ -441,21 +423,21 @@ local function mkToggle(parent, label, cfgKey, cb, order)
     row.LayoutOrder = order or 0; row.Parent = parent
 
     local lbl = Instance.new("TextLabel")
-    lbl.Text = label; lbl.Font = Enum.Font.Gotham; lbl.TextSize = 12
+    lbl.Text = label; lbl.Font = Enum.Font.Gotham; lbl.TextSize = 11
     lbl.TextColor3 = TXT; lbl.Size = UDim2.new(1,-44,1,0)
     lbl.BackgroundTransparency = 1
     lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Parent = row
 
     local tog = Instance.new("TextButton")
-    tog.Size = UDim2.new(0,36,0,20)
-    tog.Position = UDim2.new(1,-38,0.5,-10)
+    tog.Size = UDim2.new(0,36,0,18)
+    tog.Position = UDim2.new(1,-38,0.5,-9)
     tog.Text = ""; tog.BackgroundColor3 = Color3.fromRGB(60,60,60)
     tog.BorderSizePixel = 0; tog.Parent = row
     Instance.new("UICorner",tog).CornerRadius = UDim.new(1,0)
 
     local knob = Instance.new("Frame")
-    knob.Size = UDim2.new(0,16,0,16)
-    knob.Position = UDim2.new(0,2,0.5,-8)
+    knob.Size = UDim2.new(0,14,0,14)
+    knob.Position = UDim2.new(0,2,0.5,-7)
     knob.BackgroundColor3 = Color3.fromRGB(200,200,200)
     knob.BorderSizePixel = 0; knob.Parent = tog
     Instance.new("UICorner",knob).CornerRadius = UDim.new(1,0)
@@ -464,7 +446,7 @@ local function mkToggle(parent, label, cfgKey, cb, order)
         local on = CFG[cfgKey]
         tog.BackgroundColor3 = on and ACCENT or Color3.fromRGB(60,60,60)
         TweenService:Create(knob, TweenInfo.new(0.12), {
-            Position = on and UDim2.new(1,-18,0.5,-8) or UDim2.new(0,2,0.5,-8)
+            Position = on and UDim2.new(1,-16,0.5,-7) or UDim2.new(0,2,0.5,-7)
         }):Play()
     end
     refresh()
@@ -486,13 +468,13 @@ local function mkSlider(parent, label, min, max, cfgKey, order)
     top.Size = UDim2.new(1,0,0,16); top.BackgroundTransparency = 1; top.Parent = col
 
     local lbl = Instance.new("TextLabel")
-    lbl.Text = label; lbl.Font = Enum.Font.Gotham; lbl.TextSize = 12
+    lbl.Text = label; lbl.Font = Enum.Font.Gotham; lbl.TextSize = 11
     lbl.TextColor3 = TXT; lbl.Size = UDim2.new(0.7,0,1,0)
     lbl.BackgroundTransparency = 1
     lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Parent = top
 
     local vLbl = Instance.new("TextLabel")
-    vLbl.Font = Enum.Font.GothamSemibold; vLbl.TextSize = 11
+    vLbl.Font = Enum.Font.GothamBold; vLbl.TextSize = 11
     vLbl.TextColor3 = ACCENT; vLbl.Size = UDim2.new(0.3,0,1,0)
     vLbl.Position = UDim2.new(0.7,0,0,0)
     vLbl.BackgroundTransparency = 1
@@ -500,7 +482,7 @@ local function mkSlider(parent, label, min, max, cfgKey, order)
     vLbl.Text = tostring(CFG[cfgKey]); vLbl.Parent = top
 
     local track = Instance.new("Frame")
-    track.Size = UDim2.new(1,0,0,6)
+    track.Size = UDim2.new(1,0,0,4)
     track.BackgroundColor3 = Color3.fromRGB(50,50,50)
     track.BorderSizePixel = 0; track.Parent = col
     Instance.new("UICorner",track).CornerRadius = UDim.new(1,0)
@@ -574,7 +556,7 @@ end
 
 local function mkBtn(parent, text, cb, order)
     local btn = Instance.new("TextButton")
-    btn.Text = text; btn.Font = Enum.Font.GothamSemibold; btn.TextSize = 12
+    btn.Text = text; btn.Font = Enum.Font.GothamBold; btn.TextSize = 11
     btn.TextColor3 = Color3.fromRGB(255,255,255)
     btn.Size = UDim2.new(1,0,0,26)
     btn.BackgroundColor3 = ACCENT; btn.BorderSizePixel = 0
@@ -587,74 +569,63 @@ end
 -- ════════════════════════════════════════
 --              TABS
 -- ════════════════════════════════════════
-local tMain   = mkTab("Main",   1)
-local tFarm   = mkTab("Farm",   2)
-local tForge  = mkTab("Forge",  3)
-local tESP    = mkTab("ESP",    4)
-local tPlayer = mkTab("Player", 5)
+local tMain   = mkTab("Main",   0)
+local tFarm   = mkTab("Farm",   1)
+local tForge  = mkTab("Forge",  2)
+local tESP    = mkTab("ESP",    3)
+local tPlayer = mkTab("Player", 4)
 
 tabBtns["Main"].TextColor3      = Color3.fromRGB(255,255,255)
 tabBtns["Main"].BackgroundColor3= ACCENT
 tabFrames["Main"].Visible       = true
 
 -- MAIN TAB
-do
-    local c = mkCard(tMain, 1)
-    mkLbl(c, "⚡  Auto Clicker", 1)
-    mkToggle(c, "Auto Click", "AutoClick", nil, 2)
-    mkSlider(c, "Click Delay", 1, 100, "ClickDelay", 3)
-end
-do
-    local c = mkCard(tMain, 2)
-    mkLbl(c, "🎯  Rarity Filter", 1)
-    mkDropdown(c, "Target Rarity", {
-        "All","Common","Uncommon","Rare","Epic","Legendary"
-    }, "TargetRarity", 2)
-end
+local c1 = mkCard(tMain, 1)
+mkLbl(c1, "⚡  Auto Clicker", 1)
+mkToggle(c1, "Auto Click", "AutoClick", nil, 2)
+mkSlider(c1, "Click Delay", 1, 100, "ClickDelay", 3)
+
+local c2 = mkCard(tMain, 2)
+mkLbl(c2, "🎯  Rarity Filter", 1)
+mkDropdown(c2, "Target Rarity", {
+    "All","Common","Uncommon","Rare","Epic","Legendary"
+}, "TargetRarity", 2)
 
 -- FARM TAB
-do
-    local c = mkCard(tFarm, 1)
-    mkLbl(c, "🌾  Auto Farm", 1)
-    mkSub(c, "Teleports to loot within radius", 2)
-    mkToggle(c, "Auto Farm",    "AutoFarm",    nil, 3)
-    mkToggle(c, "Auto Collect", "AutoCollect", nil, 4)
-    mkSlider(c, "Farm Radius", 5, 200, "FarmRadius", 5)
-end
+local c3 = mkCard(tFarm, 1)
+mkLbl(c3, "🌾  Auto Farm", 1)
+mkSub(c3, "Teleports to loot within radius", 2)
+mkToggle(c3, "Auto Farm",    "AutoFarm",    nil, 3)
+mkToggle(c3, "Auto Collect", "AutoCollect", nil, 4)
+mkSlider(c3, "Farm Radius", 5, 200, "FarmRadius", 5)
 
 -- FORGE TAB
-do
-    local c = mkCard(tForge, 1)
-    mkLbl(c, "🔨  Loot To Forge", 1)
-    mkSub(c, "Auto forges collected loot items", 2)
-    mkToggle(c, "Auto Loot Forge",  "AutoLootForge",  nil, 3)
-    mkToggle(c, "Forge On Collect", "ForgeOnCollect", nil, 4)
-    mkBtn(c, "Forge Now", function()
-        local re = game:GetService("ReplicatedStorage"):FindFirstChild("ForgeItem")
-            or game:GetService("ReplicatedStorage"):FindFirstChild("Forge")
-        if re then pcall(function() re:FireServer() end) end
-    end, 5)
-end
+local c4 = mkCard(tForge, 1)
+mkLbl(c4, "🔨  Loot To Forge", 1)
+mkSub(c4, "Auto forges collected loot items", 2)
+mkToggle(c4, "Auto Loot Forge",  "AutoLootForge",  nil, 3)
+mkToggle(c4, "Forge On Collect", "ForgeOnCollect", nil, 4)
+mkBtn(c4, "Forge Now", function()
+    local re = game:GetService("ReplicatedStorage"):FindFirstChild("ForgeItem")
+        or game:GetService("ReplicatedStorage"):FindFirstChild("Forge")
+    if re then pcall(function() re:FireServer() end) end
+end, 5)
 
 -- ESP TAB
-do
-    local c = mkCard(tESP, 1)
-    mkLbl(c, "👁️  ESP", 1)
-    mkToggle(c, "Player ESP", "PlayerESP", nil, 2)
-    mkToggle(c, "Item ESP",   "ItemESP",   nil, 3)
-end
+local c5 = mkCard(tESP, 1)
+mkLbl(c5, "👁️  ESP", 1)
+mkToggle(c5, "Player ESP", "PlayerESP", nil, 2)
+mkToggle(c5, "Item ESP",   "ItemESP",   nil, 3)
 
 -- PLAYER TAB
-do
-    local c = mkCard(tPlayer, 1)
-    mkLbl(c, "🏃  Movement", 1)
-    mkSlider(c, "Walk Speed", 16, 250, "WalkSpeed", 2)
-    mkSlider(c, "Fly Speed",  10, 400, "FlySpeed",  3)
-    mkToggle(c, "Fly",             "IsFlying",    nil, 4)
-    mkToggle(c, "Infinite Jump",   "InfiniteJump",nil, 5)
-    mkToggle(c, "No Clip",         "NoClip",      nil, 6)
-    mkToggle(c, "Instant Proximity","InstantProx", nil, 7)
-end
+local c6 = mkCard(tPlayer, 1)
+mkLbl(c6, "🏃  Movement", 1)
+mkSlider(c6, "Walk Speed", 16, 250, "WalkSpeed", 2)
+mkSlider(c6, "Fly Speed",  10, 400, "FlySpeed",  3)
+mkToggle(c6, "Fly",             "IsFlying",    nil, 4)
+mkToggle(c6, "Infinite Jump",   "InfiniteJump",nil, 5)
+mkToggle(c6, "No Clip",         "NoClip",      nil, 6)
+mkToggle(c6, "Instant Proximity","InstantProx", nil, 7)
 
 -- Keybind toggle
 UserInputService.InputBegan:Connect(function(input, processed)
@@ -663,6 +634,22 @@ UserInputService.InputBegan:Connect(function(input, processed)
     or input.KeyCode == Enum.KeyCode.RightBracket then
         Main.Visible = not Main.Visible
     end
+end)
+
+-- Drag logic
+local dragging, dragStart, startPos
+TBar.InputBegan:Connect(function(input) 
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+        dragging = true; dragStart = input.Position; startPos = Main.Position 
+    end 
+end)
+UserInputService.InputChanged:Connect(function(input) 
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then 
+        local delta = input.Position - dragStart; Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) 
+    end 
+end)
+UserInputService.InputEnded:Connect(function(input) 
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end 
 end)
 
 print("[PrimoDax Hub | Loot To Forge] Loaded — Created By: BoboyTagaAquarius")
