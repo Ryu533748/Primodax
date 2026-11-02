@@ -13,7 +13,6 @@ local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
 local Lighting = game:GetService("Lighting")
-local VirtualUser = game:GetService("VirtualUser")
 
 local LP = Players.LocalPlayer
 local Cam = Workspace.CurrentCamera
