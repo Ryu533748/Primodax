@@ -4,7 +4,7 @@
 -- ██╔═══╝ ██╔══██╗██║██║╚██╔╝██║██║   ██║██║  ██║██╔══██║ ██╔██╗
 -- ██║     ██║  ██║██║██║ ╚═╝ ██║╚██████╔╝██████╔╝██║  ██║██╔╝ ██╗
 -- ╚═╝     ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
--- VAGRANT SURVIVAL v10.6 | DELTA VISIBILITY FIX
+-- VAGRANT SURVIVAL v11 | FULL COMPLETE VERSION
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -12,6 +12,7 @@ local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
+local Lighting = game:GetService("Lighting")
 
 local LP = Players.LocalPlayer
 local Cam = Workspace.CurrentCamera
@@ -19,9 +20,9 @@ local Cam = Workspace.CurrentCamera
 -- ============ CONFIG & DEFAULT ============
 local CFG = {
     ESPEnabled = true, ESPBox = true, ESPName = true, ESPDistance = true, ESPSkeleton = true, 
-    ESPLine = false, GunESPEnabled = false, 
+    ESPLine = false, GunESPEnabled = false, NightVision = false,
     SilentAim = true, Aimbot = false, AimbotSmoothing = 15, FOVRange = 150,
-    WallCheck = true, TargetPart = "Head", UseFOV = true,
+    WallCheck = true, TargetPart = "Head", UseFOV = true, SkipFriends = true,
     NoRecoil = false, NoSpread = false,
     InfiniteJump = true, AutoSprint = true, SprintSpeed = 22, GodMode = false,
     AutoPickup = false, PickupPriority = "Random", 
@@ -34,6 +35,36 @@ local function getHum(p) local c = getChar(p) return c and c:FindFirstChildOfCla
 local function getRoot(p) local c = getChar(p) return c and c:FindFirstChild("HumanoidRootPart") end
 local function getPart(p, n) local c = getChar(p) return c and c:FindFirstChild(n) end
 local function isAlive(p) local h = getHum(p) return h and h.Health > 0 end
+
+local function isVisible(targetPart, camPos)
+    if not CFG.WallCheck then return true end
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    rayParams.FilterDescendantsInstances = {LP.Character, Cam}
+    local result = Workspace:Raycast(camPos, targetPart.Position - camPos, rayParams)
+    if result and result.Instance then
+        return result.Instance:IsDescendantOf(targetPart.Parent)
+    end
+    return true
+end
+
+-- ============ NIGHT VISION ============
+local nightVisionColor = Instance.new("ColorCorrectionEffect")
+local nightVisionBright = Instance.new("BloomEffect")
+local function toggleNightVision()
+    if CFG.NightVision then
+        nightVisionColor.Brightness = 0.3
+        nightVisionColor.Contrast = 0.1
+        nightVisionColor.TintColor = Color3.fromRGB(200, 255, 200)
+        nightVisionColor.Parent = Lighting
+        nightVisionBright.Intensity = 0.5
+        nightVisionBright.Size = 24
+        nightVisionBright.Parent = Lighting
+    else
+        nightVisionColor.Parent = nil
+        nightVisionBright.Parent = nil
+    end
+end
 
 -- ============ ESP SYSTEM ============
 local espObjects = {}
@@ -104,29 +135,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ============ ANTI-CHEAT & SILENT AIM ============
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local method = getnamecallmethod(); local args = { ... }
-    if CFG.AntiKick and (method == "FireServer" or method == "InvokeServer") then
-        local name = (self.Name or ""):lower()
-        if name:find("kick") or name:find("ban") or name:find("detect") or name:find("report") then return nil end
-    end
-    if CFG.SilentAim and (method == "FireServer" or method == "InvokeServer") then
-        if activeTarget and isAlive(activeTarget) then
-            local targetPart = getPart(activeTarget, CFG.TargetPart)
-            if targetPart then
-                for i, v in ipairs(args) do
-                    if typeof(v) == "Vector3" then args[i] = targetPart.Position
-                    elseif typeof(v) == "CFrame" then args[i] = CFrame.new(Cam.CFrame.Position, targetPart.Position) 
-                    elseif typeof(v) == "Instance" and v:IsA("BasePart") then args[i] = targetPart end
-                end
-            end
-        end
-    end
-    return oldNamecall(self, table.unpack(args))
-end)
-
 -- ============ TARGETING & AIMBOT ============
 local activeTarget = nil
 local fovCircle = Drawing.new("Circle")
@@ -139,11 +147,18 @@ RunService.RenderStepped:Connect(function()
     local bestT, bDist = nil, CFG.FOVRange
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LP and isAlive(p) then
-            local tPart = getPart(p, CFG.TargetPart)
-            if tPart then
-                local sPos, onS = Cam:WorldToViewportPoint(tPart.Position)
-                local dist2D = (Vector2.new(sPos.X, sPos.Y) - center).Magnitude
-                if onS and dist2D < bDist then bestT = p; bDist = dist2D end
+            local isFriend = LP:IsFriendsWith(p.UserId)
+            if not (CFG.SkipFriends and isFriend) then
+                local tPart = getPart(p, CFG.TargetPart)
+                if tPart then
+                    local sPos, onS = Cam:WorldToViewportPoint(tPart.Position)
+                    local dist2D = (Vector2.new(sPos.X, sPos.Y) - center).Magnitude
+                    if onS and dist2D < bDist then
+                        if isVisible(tPart, Cam.CFrame.Position) then
+                            bestT = p; bDist = dist2D 
+                        end
+                    end
+                end
             end
         end
     end
@@ -156,6 +171,27 @@ RunService.RenderStepped:Connect(function()
             Cam.CFrame = Cam.CFrame:Lerp(targetCF, smooth)
         end
     end
+end)
+
+-- ============ ANTI-CHEAT & SILENT AIM ============
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod(); local args = { ... }
+    if CFG.AntiKick and (method == "FireServer" or method == "InvokeServer") then
+        local name = (self.Name or ""):lower()
+        if name:find("kick") or name:find("ban") or name:find("detect") or name:find("report") then return nil end
+    end
+    if CFG.SilentAim and (method == "FireServer" or method == "InvokeServer") and activeTarget and isAlive(activeTarget) then
+        local targetPart = getPart(activeTarget, CFG.TargetPart)
+        if targetPart and isVisible(targetPart, Cam.CFrame.Position) then
+            for i, v in ipairs(args) do
+                if typeof(v) == "Vector3" then args[i] = targetPart.Position
+                elseif typeof(v) == "CFrame" then args[i] = CFrame.new(Cam.CFrame.Position, targetPart.Position) 
+                elseif typeof(v) == "Instance" and v:IsA("BasePart") then args[i] = targetPart end
+            end
+        end
+    end
+    return oldNamecall(self, table.unpack(args))
 end)
 
 -- ============ MOVEMENT & RECOIL ============
@@ -224,7 +260,7 @@ local function doTeleportBag()
     end
 end
 
--- ============ UI SYSTEM (DELTA VISIBILITY FIX) ============
+-- ============ UI SYSTEM ============
 local parentGui = gethui and gethui() or CoreGui
 if parentGui:FindFirstChild("VagrantSurvivalUI") then parentGui:FindFirstChild("VagrantSurvivalUI"):Destroy() end
 
@@ -258,9 +294,7 @@ UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
         if draggingBtn then
             local delta = input.Position - dragStartBtn
-            if math.abs(delta.X) < 5 and math.abs(delta.Y) < 5 then
-                MF.Visible = not MF.Visible
-            end
+            if math.abs(delta.X) < 5 and math.abs(delta.Y) < 5 then MF.Visible = not MF.Visible end
         end
         draggingBtn = false 
     end 
@@ -272,7 +306,7 @@ Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 8)
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -10, 0, 20); Title.Position = UDim2.new(0, 10, 0, 2); Title.BackgroundTransparency = 1
-Title.Text = "Vagrant Survival v10"; Title.TextColor3 = Color3.fromRGB(200, 200, 200); Title.Font = Enum.Font.GothamBold; Title.TextSize = 13; Title.TextXAlignment = Enum.TextXAlignment.Left; Title.Parent = TopBar
+Title.Text = "Vagrant Survival v11"; Title.TextColor3 = Color3.fromRGB(200, 200, 200); Title.Font = Enum.Font.GothamBold; Title.TextSize = 13; Title.TextXAlignment = Enum.TextXAlignment.Left; Title.Parent = TopBar
 
 local SubTitle = Instance.new("TextLabel")
 SubTitle.Size = UDim2.new(1, -10, 0, 10); SubTitle.Position = UDim2.new(0, 10, 0, 18); SubTitle.BackgroundTransparency = 1
@@ -295,6 +329,12 @@ local Pages = {}
 local function makePage(name)
     local frame = Instance.new("ScrollingFrame")
     frame.Size = UDim2.new(1, 0, 1, 0); frame.BackgroundTransparency = 1; frame.ScrollBarThickness = 2; frame.AutomaticCanvasSize = Enum.AutomaticSize.Y; frame.Visible = false; frame.Parent = Content
+    
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 4)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = frame
+    
     Pages[name] = frame
     return frame
 end
@@ -358,7 +398,6 @@ local function makeDropdown(name, key, options, parent, order)
     end)
 end
 
-local visLayout = Instance.new("UIListLayout"); visLayout.Padding = UDim.new(0, 2); visLayout.Parent = VisualPage
 makeToggle("Enable ESP", "ESPEnabled", VisualPage, 1)
 makeToggle("Box ESP", "ESPBox", VisualPage, 2)
 makeToggle("Name ESP", "ESPName", VisualPage, 3)
@@ -366,20 +405,20 @@ makeToggle("Distance ESP", "ESPDistance", VisualPage, 4)
 makeToggle("Skeleton", "ESPSkeleton", VisualPage, 5)
 makeToggle("Tracer Line", "ESPLine", VisualPage, 6)
 makeToggle("Gun ESP (Loot)", "GunESPEnabled", VisualPage, 7)
+makeToggle("Night Vision", "NightVision", VisualPage, 8, toggleNightVision)
 
-local comLayout = Instance.new("UIListLayout"); comLayout.Padding = UDim.new(0, 2); comLayout.Parent = CombatPage
 makeToggle("Silent Aim", "SilentAim", CombatPage, 1)
-makeToggle("Aimbot (Smooth)", "Aimbot", CombatPage, 2)
-makeSlider("Aimbot Smooth", "AimbotSmoothing", 0, 100, CombatPage, 3)
-makeToggle("Wall Check", "WallCheck", CombatPage, 4)
-makeDropdown("Target Part", "TargetPart", {"Head", "HumanoidRootPart", "Torso"}, CombatPage, 5)
-makeDropdown("Priority", "Priority", {"Crosshair", "Distance"}, CombatPage, 6)
-makeToggle("Use FOV", "UseFOV", CombatPage, 7)
-makeSlider("FOV Radius", "FOVRange", 0, 800, CombatPage, 8)
-makeToggle("No Recoil", "NoRecoil", CombatPage, 9)
-makeToggle("No Spread", "NoSpread", CombatPage, 10)
+makeToggle("Skip Friends", "SkipFriends", CombatPage, 2)
+makeToggle("Aimbot (Smooth)", "Aimbot", CombatPage, 3)
+makeSlider("Aimbot Smooth", "AimbotSmoothing", 0, 100, CombatPage, 4)
+makeToggle("Wall Check", "WallCheck", CombatPage, 5)
+makeDropdown("Target Part", "TargetPart", {"Head", "HumanoidRootPart", "Torso"}, CombatPage, 6)
+makeDropdown("Priority", "Priority", {"Crosshair", "Distance"}, CombatPage, 7)
+makeToggle("Use FOV", "UseFOV", CombatPage, 8)
+makeSlider("FOV Radius", "FOVRange", 0, 800, CombatPage, 9)
+makeToggle("No Recoil", "NoRecoil", CombatPage, 10)
+makeToggle("No Spread", "NoSpread", CombatPage, 11)
 
-local setLayout = Instance.new("UIListLayout"); setLayout.Padding = UDim.new(0, 2); setLayout.Parent = SettingsPage
 makeToggle("Infinite Jump", "InfiniteJump", SettingsPage, 1)
 makeToggle("Auto Sprint", "AutoSprint", SettingsPage, 2)
 makeSlider("Sprint Speed", "SprintSpeed", 16, 100, SettingsPage, 3)
@@ -420,9 +459,9 @@ TopBar.InputBegan:Connect(function(input)
     end 
 end)
 UserInputService.InputChanged:Connect(function(input) 
-    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then 
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - dragStart
-        MF.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) 
+                MF.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) 
     end 
 end)
 UserInputService.InputEnded:Connect(function(input) 
