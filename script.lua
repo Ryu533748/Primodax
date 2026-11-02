@@ -4,7 +4,7 @@
 -- ██╔═══╝ ██╔══██╗██║██║╚██╔╝██║██║   ██║██║  ██║██╔══██║ ██╔██╗
 -- ██║     ██║  ██║██║██║ ╚═╝ ██║╚██████╔╝██████╔╝██║  ██║██╔╝ ██╗
 -- ╚═╝     ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
--- VAGRANT SURVIVAL v19 | ANTI-CRASH & STABILITY
+-- VAGRANT SURVIVAL v20 | FINAL RELEASE
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -13,6 +13,7 @@ local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
 local Lighting = game:GetService("Lighting")
+local VirtualUser = game:GetService("VirtualUser")
 
 local LP = Players.LocalPlayer
 local Cam = Workspace.CurrentCamera
@@ -403,7 +404,7 @@ Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 8)
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -10, 0, 20); Title.Position = UDim2.new(0, 10, 0, 2); Title.BackgroundTransparency = 1
-Title.Text = "Vagrant Survival v19"; Title.TextColor3 = Color3.fromRGB(200, 200, 200); Title.Font = Enum.Font.GothamBold; Title.TextSize = 13; Title.TextXAlignment = Enum.TextXAlignment.Left; Title.Parent = TopBar
+Title.Text = "Vagrant Survival v20"; Title.TextColor3 = Color3.fromRGB(200, 200, 200); Title.Font = Enum.Font.GothamBold; Title.TextSize = 13; Title.TextXAlignment = Enum.TextXAlignment.Left; Title.Parent = TopBar
 
 local SubTitle = Instance.new("TextLabel")
 SubTitle.Size = UDim2.new(1, -10, 0, 10); SubTitle.Position = UDim2.new(0, 10, 0, 18); SubTitle.BackgroundTransparency = 1
