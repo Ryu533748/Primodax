@@ -4,7 +4,7 @@
 -- ██╔═══╝ ██╔══██╗██║██║╚██╔╝██║██║   ██║██║  ██║██╔══██║ ██╔██╗
 -- ██║     ██║  ██║██║██║ ╚═╝ ██║╚██████╔╝██████╔╝██║  ██║██╔╝ ██╗
 -- ╚═╝     ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
--- PRIMODAX VGRANT v7.2 | ULTIMATE FLY | CROSSBOW RELOAD | NO ERROR
+-- PRIMODAX VGRANT v7.2 | GODMODE | FLY JUMP FIXED | BG FIXED
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -23,7 +23,7 @@ local CFG = {
     SilentAim = false, Aimbot = false, AimbotSmoothing = 15, FOVRange = 120,
     SkipFriends = true, AutoRespawn = false, RespawnToBag = false,
     InfiniteJump = false, AutoSprint = false, SprintSpeed = 20,
-    ESPEnabled = false, AutoPickup = false, PickupPriority = "Random", 
+    ESPEnabled = false, AutoPickup = false, PickupPriority = "Random",
     AntiKick = true, UnlimitedAmmo = false, AutoReload = false,
     WideScreen = false, CameraFOV = 70, GodMode = false
 }
@@ -35,7 +35,7 @@ local function getRoot(p) local c = getChar(p) return c and c:FindFirstChild("Hu
 local function getPart(p, n) local c = getChar(p) return c and c:FindFirstChild(n) end
 local function isAlive(p) local h = getHum(p) return h and h.Health > 0 end
 
--- ============ GODMODE (HINDI NAMAMATAY) ============
+-- ============ GODMODE ============
 RunService.Heartbeat:Connect(function()
     if not CFG.GodMode then return end
     local hum = getHum(LP)
@@ -114,7 +114,7 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     return oldNamecall(self, table.unpack(args))
 end)
 
--- ============ MAIN RENDER (AIMBOT) ============
+-- ============ MAIN RENDER ============
 RunService.RenderStepped:Connect(function()
     fovCircle.Position = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
     fovCircle.Radius = CFG.FOVRange
@@ -170,7 +170,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ============ CROSSBOW RELOAD (GUMAGANA) ============
+-- ============ V6.2 RELOAD + AUTO FIRE ============
 RunService.Heartbeat:Connect(function()
     if not CFG.UnlimitedAmmo and not CFG.AutoReload then return end
     local char = getChar(LP) if not char then return end
@@ -197,31 +197,50 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ============ INFINITE FLY (CFRAME NUDGE FIX) ============
--- Ito ang tamang paraan. Hindi na Velocity kasi kinakain ng server.
-RunService.RenderStepped:Connect(function()
-    if not CFG.InfiniteJump then return end
+-- ============ MOVEMENT (FLY JUMP FIXED) ============
+local infJumpConnection = nil
+
+local function enableInfiniteJump()
+    if infJumpConnection then return end
+    infJumpConnection = UserInputService.JumpRequest:Connect(function()
+        if not CFG.InfiniteJump then return end
+        local char = getChar(LP)
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if hum and root and hum.Health > 0 then
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+            task.wait()
+            root.AssemblyLinearVelocity = Vector3.new(
+                root.AssemblyLinearVelocity.X,
+                60,
+                root.AssemblyLinearVelocity.Z
+            )
+        end
+    end)
+end
+
+local function disableInfiniteJump()
+    if infJumpConnection then
+        infJumpConnection:Disconnect()
+        infJumpConnection = nil
+    end
+end
+
+-- Auto Sprint + state sync for infinite jump
+RunService.Heartbeat:Connect(function()
+    if CFG.InfiniteJump then
+        enableInfiniteJump()
+    else
+        disableInfiniteJump()
+    end
+
     local char = getChar(LP)
     if not char then return end
     local hum = getHum(LP)
     local root = getRoot(LP)
     if not hum or not root then return end
 
-    local isJumping = UserInputService:IsKeyDown(Enum.KeyCode.Space) or 
-                      UserInputService:IsKeyDown(Enum.KeyCode.ButtonA) or
-                      (UserInputService.TouchEnabled and hum:GetState() == Enum.HumanoidStateType.Jumping)
-    
-    if isJumping then
-        -- Direktang i-nudge pataas yung CFrame ng HumanoidRootPart, frame by frame
-        root.CFrame = root.CFrame + Vector3.new(0, 1.5, 0)
-        root.Velocity = Vector3.new(root.Velocity.X, 0, root.Velocity.Z) -- i-reset yung Y velocity para hindi bumagsak
-    end
-end)
-
--- ============ AUTO SPRINT ============
-RunService.Heartbeat:Connect(function()
-    local hum = getHum(LP)
-    if not hum then return end
     if CFG.AutoSprint then
         if hum.WalkSpeed < CFG.SprintSpeed then hum.WalkSpeed = CFG.SprintSpeed end
     elseif hum.WalkSpeed == CFG.SprintSpeed then
@@ -307,7 +326,7 @@ SG.IgnoreGuiInset = true
 SG.Parent = CoreGui
 
 local MF = Instance.new("Frame")
-MF.Size = UDim2.new(0, 550, 0, 300) -- Landscape Size
+MF.Size = UDim2.new(0, 550, 0, 300)
 MF.Position = UDim2.new(0.5, -275, 0.5, -150)
 MF.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 MF.BorderSizePixel = 0
@@ -322,18 +341,18 @@ local bgImg = Instance.new("ImageLabel")
 bgImg.Size = UDim2.new(1, 0, 1, 0)
 bgImg.Position = UDim2.new(0, 0, 0, 0)
 bgImg.BackgroundTransparency = 1
-bgImg.Image = "rbxassetid://118004643139453" 
+bgImg.Image = "rbxassetid://118004643139453"
 bgImg.ScaleType = Enum.ScaleType.Crop
 bgImg.ZIndex = 1
-bgImg.ImageTransparency = 0 -- 0 = Full Visibility
+bgImg.ImageTransparency = 0
 bgImg.Parent = MF
 Instance.new("UICorner", bgImg).CornerRadius = UDim.new(0, 12)
 
--- Dark Overlay (Para mabasa yung text)
+-- Dark Overlay
 local overlay = Instance.new("Frame")
 overlay.Size = UDim2.new(1, 0, 1, 0)
 overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-overlay.BackgroundTransparency = 0.6 
+overlay.BackgroundTransparency = 0.6
 overlay.ZIndex = 2
 overlay.Parent = MF
 Instance.new("UICorner", overlay).CornerRadius = UDim.new(0, 12)
@@ -391,12 +410,12 @@ local LayoutR = Instance.new("UIListLayout"); LayoutR.Padding = UDim.new(0, 4); 
 local function makeSection(text, order, parent)
     local lbl = Instance.new("TextLabel"); lbl.Size = UDim2.new(1, -5, 0, 20); lbl.BackgroundTransparency = 1; lbl.Text = "── " .. text .. " ──"; lbl.TextColor3 = Color3.fromRGB(255, 215, 0); lbl.Font = Enum.Font.GothamBold; lbl.TextSize = 12; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.LayoutOrder = order; lbl.ZIndex = 4; lbl.Parent = parent
 end
-local function makeToggle(name, key, order, parent)
+local function makeToggle(name, key, order, parent, callback)
     local btn = Instance.new("TextButton"); btn.Size = UDim2.new(1, -5, 0, 26); btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30); btn.BackgroundTransparency = 0.3; btn.TextColor3 = Color3.fromRGB(255, 255, 255); btn.Font = Enum.Font.Gotham; btn.TextSize = 11; btn.TextXAlignment = Enum.TextXAlignment.Left; btn.LayoutOrder = order; btn.ZIndex = 4; btn.Parent = parent
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
     local function update() btn.Text = "  " .. (CFG[key] and "🟢 " or "🔴 ") .. name; btn.BackgroundColor3 = CFG[key] and Color3.fromRGB(35, 80, 40) or Color3.fromRGB(30, 30, 30) end
     update()
-    btn.MouseButton1Click:Connect(function() CFG[key] = not CFG[key]; update() end)
+    btn.MouseButton1Click:Connect(function() CFG[key] = not CFG[key]; update(); if callback then callback() end end)
 end
 local function makeSlider(name, key, min, max, order, parent, callback)
     local frame = Instance.new("Frame"); frame.Size = UDim2.new(1, -5, 0, 32); frame.BackgroundTransparency = 1; frame.LayoutOrder = order; frame.ZIndex = 4; frame.Parent = parent
@@ -408,7 +427,7 @@ local function makeSlider(name, key, min, max, order, parent, callback)
     local dragging = false
     bar.MouseButton1Down:Connect(function() dragging = true end)
     UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging = false end end)
-    local function processInput(x) 
+    local function processInput(x)
         if not dragging then return end
         local rel = math.clamp((x - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
         local val = math.floor(min + rel * (max - min))
@@ -438,14 +457,14 @@ makeToggle("Wide Screen", "WideScreen", 12, LeftCol, updateCameraFOV)
 makeSlider("Camera FOV", "CameraFOV", 40, 120, 13, LeftCol, updateCameraFOV)
 
 makeSection("MOVEMENT", 20, LeftCol)
-makeToggle("Infinite Fly (Hold Jump)", "InfiniteJump", 21, LeftCol)
+makeToggle("Infinite Jump (Fly)", "InfiniteJump", 21, LeftCol)
 makeToggle("Auto Sprint (Safe)", "AutoSprint", 22, LeftCol)
 makeSlider("Sprint Speed (Max 22)", "SprintSpeed", 16, 22, 23, LeftCol)
-makeToggle("GodMode (No Death)", "GodMode", 24, LeftCol)
+makeToggle("GodMode (Semi-God)", "GodMode", 24, LeftCol)
 
 makeSection("WEAPONS", 1, RightCol)
 makeToggle("Unlimited Ammo", "UnlimitedAmmo", 2, RightCol)
-makeToggle("Auto Reload (Crossbow)", "AutoReload", 3, RightCol)
+makeToggle("Auto Reload (Spam Fire)", "AutoReload", 3, RightCol)
 
 makeSection("LOOT & PICKUP", 10, RightCol)
 makeToggle("Auto Pickup", "AutoPickup", 11, RightCol)
@@ -474,7 +493,4 @@ end)
 local toggleBtn = Instance.new("TextButton")
 toggleBtn.Size = UDim2.fromOffset(60, 60); toggleBtn.Position = UDim2.new(0.5, -30, 1, -95); toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 215, 0); toggleBtn.Text = "⚡"; toggleBtn.TextColor3 = Color3.fromRGB(0, 0, 0); toggleBtn.TextSize = 24; toggleBtn.Font = Enum.Font.GothamBold; toggleBtn.Parent = SG
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
-
-local drag, dragStart, startPos = false, nil, nil
-toggleBtn.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then drag = true; dragStart = input.Position; startPos = toggleBtn.Position end end)
-UserInputService.InputChanged:Connect(function(input) if drag and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then local delta = input.Position - dragStart; toggleBtn.Position = UDim2.new(startPos.X.Sc
+toggleBtn.MouseButton1Click:Connect(function() MF.Visible = not MF.Visible end)
