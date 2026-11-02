@@ -4,7 +4,7 @@
 -- ██╔═══╝ ██╔══██╗██║██║╚██╔╝██║██║   ██║██║  ██║██╔══██║ ██╔██╗
 -- ██║     ██║  ██║██║██║ ╚═╝ ██║╚██████╔╝██████╔╝██║  ██║██╔╝ ██╗
 -- ╚═╝     ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
--- VAGRANT SURVIVAL v10.3 | FLOATING TOGGLE FIXED
+-- VAGRANT SURVIVAL v10.5 | CLEAN FIX
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -18,22 +18,13 @@ local Cam = Workspace.CurrentCamera
 
 -- ============ CONFIG & DEFAULT ============
 local CFG = {
-    -- Visual
     ESPEnabled = true, ESPBox = true, ESPName = true, ESPDistance = true, ESPSkeleton = true, 
     ESPLine = false, GunESPEnabled = false, 
-    
-    -- Combat
     SilentAim = true, Aimbot = false, AimbotSmoothing = 15, FOVRange = 150,
     WallCheck = true, TargetPart = "Head", UseFOV = true,
     NoRecoil = false, NoSpread = false,
-    
-    -- Movement
     InfiniteJump = true, AutoSprint = true, SprintSpeed = 22, GodMode = false,
-    
-    -- Loot
     AutoPickup = false, PickupPriority = "Random", 
-    
-    -- System
     AntiKick = true
 }
 
@@ -49,15 +40,8 @@ local espObjects = {}
 local function createESP(player)
     if espObjects[player] or player == LP then return end
     local objs = {
-        Box = Drawing.new("Square"),
-        Name = Drawing.new("Text"),
-        Dist = Drawing.new("Text"),
-        Line = Drawing.new("Line"),
-        Skel = {
-            Head = Drawing.new("Line"), Torso = Drawing.new("Line"),
-            LArm = Drawing.new("Line"), RArm = Drawing.new("Line"),
-            LLeg = Drawing.new("Line"), RLeg = Drawing.new("Line")
-        }
+        Box = Drawing.new("Square"), Name = Drawing.new("Text"), Dist = Drawing.new("Text"), Line = Drawing.new("Line"),
+        Skel = { Head = Drawing.new("Line"), Torso = Drawing.new("Line"), LArm = Drawing.new("Line"), RArm = Drawing.new("Line"), LLeg = Drawing.new("Line"), RLeg = Drawing.new("Line") }
     }
     objs.Box.Thickness = 1; objs.Box.Color = Color3.fromRGB(255, 50, 50); objs.Box.Filled = false
     objs.Name.Size = 14; objs.Name.Center = true; objs.Name.Outline = true; objs.Name.Color = Color3.fromRGB(255, 255, 255)
@@ -72,8 +56,7 @@ Players.PlayerAdded:Connect(createESP)
 Players.PlayerRemoving:Connect(function(p)
     if espObjects[p] then
         for _, v in pairs(espObjects[p]) do
-            if typeof(v) == "table" then
-                for _, l in pairs(v) do pcall(function() l:Remove() end) end
+            if typeof(v) == "table" then for _, l in pairs(v) do pcall(function() l:Remove() end) end
             else pcall(function() v:Remove() end) end
         end
         espObjects[p] = nil
@@ -84,44 +67,22 @@ RunService.RenderStepped:Connect(function()
     for player, objs in pairs(espObjects) do
         local isRendered = false
         if CFG.ESPEnabled and isAlive(player) then
-            local char = getChar(player)
-            local root = getRoot(player)
-            local head = getPart(player, "Head")
-            local myRoot = getRoot(LP)
-            
+            local char = getChar(player); local root = getRoot(player); local head = getPart(player, "Head"); local myRoot = getRoot(LP)
             if root and head and myRoot then
                 local headPos, onScreen = Cam:WorldToViewportPoint(head.Position)
                 local rootPos, _ = Cam:WorldToViewportPoint(root.Position)
-                
                 if onScreen then
                     isRendered = true
-                    local height = math.abs(rootPos.Y - headPos.Y) * 1.8
-                    local width = height * 0.6
-                    
-                    objs.Box.Visible = CFG.ESPBox
-                    objs.Box.Size = Vector2.new(width, height)
-                    objs.Box.Position = Vector2.new(headPos.X - width/2, headPos.Y - height*0.2)
-                    
-                    objs.Name.Visible = CFG.ESPName
-                    objs.Name.Text = player.Name
-                    objs.Name.Position = Vector2.new(headPos.X, headPos.Y - 20)
-                    
-                    objs.Dist.Visible = CFG.ESPDistance
-                    objs.Dist.Text = string.format("[%d studs]", (myRoot.Position - root.Position).Magnitude)
-                    objs.Dist.Position = Vector2.new(headPos.X, rootPos.Y + 10)
-                    
-                    objs.Line.Visible = CFG.ESPLine
-                    objs.Line.From = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y)
-                    objs.Line.To = Vector2.new(headPos.X, headPos.Y)
-                    
+                    local height = math.abs(rootPos.Y - headPos.Y) * 1.8; local width = height * 0.6
+                    objs.Box.Visible = CFG.ESPBox; objs.Box.Size = Vector2.new(width, height); objs.Box.Position = Vector2.new(headPos.X - width/2, headPos.Y - height*0.2)
+                    objs.Name.Visible = CFG.ESPName; objs.Name.Text = player.Name; objs.Name.Position = Vector2.new(headPos.X, headPos.Y - 20)
+                    objs.Dist.Visible = CFG.ESPDistance; objs.Dist.Text = string.format("[%d studs]", (myRoot.Position - root.Position).Magnitude); objs.Dist.Position = Vector2.new(headPos.X, rootPos.Y + 10)
+                    objs.Line.Visible = CFG.ESPLine; objs.Line.From = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y); objs.Line.To = Vector2.new(headPos.X, headPos.Y)
                     if CFG.ESPSkeleton then
                         local function drawBone(p1, p2, line)
                             if p1 and p2 then
-                                local v1, on1 = Cam:WorldToViewportPoint(p1.Position)
-                                local v2, on2 = Cam:WorldToViewportPoint(p2.Position)
-                                line.Visible = on1 and on2
-                                line.From = Vector2.new(v1.X, v1.Y)
-                                line.To = Vector2.new(v2.X, v2.Y)
+                                local v1, on1 = Cam:WorldToViewportPoint(p1.Position); local v2, on2 = Cam:WorldToViewportPoint(p2.Position)
+                                line.Visible = on1 and on2; line.From = Vector2.new(v1.X, v1.Y); line.To = Vector2.new(v2.X, v2.Y)
                             else line.Visible = false end
                         end
                         drawBone(head, char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"), objs.Skel.Head)
@@ -146,14 +107,11 @@ end)
 -- ============ ANTI-CHEAT & SILENT AIM ============
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local method = getnamecallmethod()
-    local args = { ... }
-    
+    local method = getnamecallmethod(); local args = { ... }
     if CFG.AntiKick and (method == "FireServer" or method == "InvokeServer") then
         local name = (self.Name or ""):lower()
         if name:find("kick") or name:find("ban") or name:find("detect") or name:find("report") then return nil end
     end
-    
     if CFG.SilentAim and (method == "FireServer" or method == "InvokeServer") then
         if activeTarget and isAlive(activeTarget) then
             local targetPart = getPart(activeTarget, CFG.TargetPart)
@@ -177,7 +135,6 @@ fovCircle.Thickness = 1.5; fovCircle.Color = Color3.fromRGB(255, 255, 255); fovC
 RunService.RenderStepped:Connect(function()
     fovCircle.Position = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
     fovCircle.Radius = CFG.FOVRange; fovCircle.Visible = CFG.UseFOV
-    
     local center = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
     local bestT, bDist = nil, CFG.FOVRange
     for _, p in ipairs(Players:GetPlayers()) do
@@ -191,7 +148,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
     activeTarget = bestT
-    
     if CFG.Aimbot and activeTarget then
         local tPart = getPart(activeTarget, CFG.TargetPart)
         if tPart then
@@ -207,8 +163,7 @@ UserInputService.JumpRequest:Connect(function()
     if CFG.InfiniteJump then
         local hum = getHum(LP); local root = getRoot(LP)
         if hum and root and hum.Health > 0 then
-            hum:ChangeState(Enum.HumanoidStateType.Jumping)
-            task.wait()
+            hum:ChangeState(Enum.HumanoidStateType.Jumping); task.wait()
             root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 60, root.AssemblyLinearVelocity.Z)
         end
     end
@@ -235,7 +190,6 @@ local function doTeleportBag()
     if not myRoot then return end
     local bestBag, bestDist = nil, math.huge
     local myName, myId = LP.Name:lower(), tostring(LP.UserId)
-    
     for _, obj in ipairs(Workspace:GetDescendants()) do
         local n = (obj.Name or ""):lower()
         if n:find("bag") or n:find("loot") or n:find("corpse") or n:find("drop") then
@@ -253,7 +207,6 @@ local function doTeleportBag()
             end
         end
     end
-    
     if bestBag then
         myRoot.CFrame = bestBag.CFrame * CFrame.new(0, 3, 0)
     else
@@ -271,12 +224,13 @@ local function doTeleportBag()
     end
 end
 
--- ============ UI SYSTEM ============
-if CoreGui:FindFirstChild("VagrantSurvivalUI") then CoreGui:FindFirstChild("VagrantSurvivalUI"):Destroy() end
-local SG = Instance.new("ScreenGui")
-SG.Name = "VagrantSurvivalUI"; SG.ResetOnSpawn = false; SG.IgnoreGuiInset = true; SG.Parent = CoreGui
+-- ============ UI SYSTEM (DELTA FIX) ============
+local parentGui = gethui and gethui() or CoreGui
+if parentGui:FindFirstChild("VagrantSurvivalUI") then parentGui:FindFirstChild("VagrantSurvivalUI"):Destroy() end
 
--- Floating Toggle Button
+local SG = Instance.new("ScreenGui")
+SG.Name = "VagrantSurvivalUI"; SG.ResetOnSpawn = false; SG.IgnoreGuiInset = true; SG.Parent = parentGui
+
 local FloatBtn = Instance.new("TextButton")
 FloatBtn.Size = UDim2.new(0, 40, 0, 40); FloatBtn.Position = UDim2.new(0, 20, 0, 20)
 FloatBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20); FloatBtn.Text = "⚙️"; FloatBtn.TextSize = 20; FloatBtn.TextColor3 = Color3.fromRGB(100, 50, 200); FloatBtn.Parent = SG
@@ -288,7 +242,6 @@ MF.Size = UDim2.new(0, 520, 0, 340); MF.Position = UDim2.new(0.5, -260, 0.5, -17
 MF.BackgroundColor3 = Color3.fromRGB(12, 12, 12); MF.BorderSizePixel = 0; MF.Active = true; MF.Visible = false; MF.Parent = SG
 Instance.new("UICorner", MF).CornerRadius = UDim.new(0, 8)
 
--- Floating Btn Logic & Draggable
 local draggingBtn, dragStartBtn, startPosBtn
 FloatBtn.InputBegan:Connect(function(input) 
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
@@ -467,7 +420,8 @@ TopBar.InputBegan:Connect(function(input)
 end)
 UserInputService.InputChanged:Connect(function(input) 
     if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then 
-        local delta = input.Position - dragStart; MF.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) 
+        local delta = input.Position - dragStart
+        MF.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) 
     end 
 end)
 UserInputService.InputEnded:Connect(function(input) 
