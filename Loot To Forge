@@ -1,0 +1,836 @@
+-- PrimoDax Hub
+-- Created By: BoboyTagaAquarius
+-- Luau | Script Hub | Roblox Executor
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local RootPart = Character:WaitForChild("HumanoidRootPart")
+
+-- ════════════════════════════════════════
+--              STATE
+-- ════════════════════════════════════════
+local State = {
+    -- Player
+    WalkSpeed       = 32,
+    FlySpeed        = 60,
+    IsFlying        = false,
+    InfiniteJump    = false,
+    NoClip          = false,
+    InstantProximpt = false,
+
+    -- Dungeon
+    AutoDungeon     = false,
+    DungeonStage    = 1,
+    ForceKillDungEn = false,
+
+    -- Tower
+    AutoTower       = false,
+    TowerRound      = 1,
+    FarmRoundsOrder = false,
+    ForceKillTowEn  = false,
+
+    -- Forge
+    AutoForge       = false,
+    ForgeTarget     = "Great Sword",
+    ForgeGear       = "Weapon",
+    ForgeRarity     = "One",
+    ForgeSpendBest  = false,
+
+    -- Sell
+    AutoSell        = false,
+    SellRarityFilter= "One",
+    SellItemTypes   = false,
+    KeepPerItem     = 0,
+
+    -- Main / Rebirth
+    AutoRebirth     = false,
+    AutoBuyUpgrades = false,
+    UpgradesToBuy   = "",
+    AutoTrain       = false,
+    TrainArea       = "Area 1 (Rebirth 0)",
+    ClicksPerSec    = 6,
+}
+
+-- ════════════════════════════════════════
+--              GUI BUILD
+-- ════════════════════════════════════════
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name           = "PrimoDaxHub"
+ScreenGui.ResetOnSpawn   = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent         = game:GetService("CoreGui")
+
+-- Main Frame
+local MainFrame = Instance.new("Frame")
+MainFrame.Name            = "MainFrame"
+MainFrame.Size            = UDim2.new(0, 340, 0, 480)
+MainFrame.Position        = UDim2.new(0.5, -170, 0.5, -240)
+MainFrame.BackgroundColor3= Color3.fromRGB(18, 18, 18)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active          = true
+MainFrame.Draggable       = true
+MainFrame.Parent          = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+-- Title Bar
+local TitleBar = Instance.new("Frame")
+TitleBar.Name              = "TitleBar"
+TitleBar.Size              = UDim2.new(1, 0, 0, 36)
+TitleBar.BackgroundColor3  = Color3.fromRGB(30, 30, 30)
+TitleBar.BorderSizePixel   = 0
+TitleBar.Parent            = MainFrame
+
+local UICornerTitle = Instance.new("UICorner")
+UICornerTitle.CornerRadius = UDim.new(0, 8)
+UICornerTitle.Parent       = TitleBar
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Text            = "PrimoDax Hub"
+TitleLabel.Font            = Enum.Font.GothamBold
+TitleLabel.TextSize        = 16
+TitleLabel.TextColor3      = Color3.fromRGB(255, 255, 255)
+TitleLabel.Size            = UDim2.new(1, -80, 1, 0)
+TitleLabel.Position        = UDim2.new(0, 12, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.TextXAlignment  = Enum.TextXAlignment.Left
+TitleLabel.Parent          = TitleBar
+
+local CreatorLabel = Instance.new("TextLabel")
+CreatorLabel.Text          = "Created By: BoboyTagaAquarius"
+CreatorLabel.Font          = Enum.Font.Gotham
+CreatorLabel.TextSize      = 9
+CreatorLabel.TextColor3    = Color3.fromRGB(180, 180, 180)
+CreatorLabel.Size          = UDim2.new(1, -80, 0, 14)
+CreatorLabel.Position      = UDim2.new(0, 12, 0, 20)
+CreatorLabel.BackgroundTransparency = 1
+CreatorLabel.TextXAlignment= Enum.TextXAlignment.Left
+CreatorLabel.Parent        = TitleBar
+
+-- Close / Minimize
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Text              = "✕"
+CloseBtn.Font              = Enum.Font.GothamBold
+CloseBtn.TextSize          = 14
+CloseBtn.TextColor3        = Color3.fromRGB(255,80,80)
+CloseBtn.Size              = UDim2.new(0, 28, 0, 28)
+CloseBtn.Position          = UDim2.new(1, -32, 0, 4)
+CloseBtn.BackgroundColor3  = Color3.fromRGB(40,40,40)
+CloseBtn.BorderSizePixel   = 0
+CloseBtn.Parent            = TitleBar
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0,6)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- Tab Bar
+local TabBar = Instance.new("Frame")
+TabBar.Name             = "TabBar"
+TabBar.Size             = UDim2.new(1, 0, 0, 32)
+TabBar.Position         = UDim2.new(0, 0, 0, 36)
+TabBar.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+TabBar.BorderSizePixel  = 0
+TabBar.Parent           = MainFrame
+
+local TabLayout = Instance.new("UIListLayout")
+TabLayout.FillDirection  = Enum.FillDirection.Horizontal
+TabLayout.SortOrder      = Enum.SortOrder.LayoutOrder
+TabLayout.Padding        = UDim.new(0, 2)
+TabLayout.Parent         = TabBar
+
+-- Content Frame
+local ContentFrame = Instance.new("ScrollingFrame")
+ContentFrame.Name              = "ContentFrame"
+ContentFrame.Size              = UDim2.new(1, 0, 1, -68)
+ContentFrame.Position          = UDim2.new(0, 0, 0, 68)
+ContentFrame.BackgroundColor3  = Color3.fromRGB(18,18,18)
+ContentFrame.BorderSizePixel   = 0
+ContentFrame.ScrollBarThickness= 4
+ContentFrame.CanvasSize        = UDim2.new(0, 0, 0, 0)
+ContentFrame.AutomaticCanvasSize= Enum.AutomaticSize.Y
+ContentFrame.Parent            = MainFrame
+
+local ContentLayout = Instance.new("UIListLayout")
+ContentLayout.SortOrder   = Enum.SortOrder.LayoutOrder
+ContentLayout.Padding     = UDim.new(0, 4)
+ContentLayout.Parent      = ContentFrame
+
+local ContentPad = Instance.new("UIPadding")
+ContentPad.PaddingLeft   = UDim.new(0,8)
+ContentPad.PaddingRight  = UDim.new(0,8)
+ContentPad.PaddingTop    = UDim.new(0,6)
+ContentPad.PaddingBottom = UDim.new(0,6)
+ContentPad.Parent        = ContentFrame
+
+-- ════════════════════════════════════════
+--           UI HELPERS
+-- ════════════════════════════════════════
+local ACCENT   = Color3.fromRGB(255, 105, 180)  -- pink like screenshots
+local BG_CARD  = Color3.fromRGB(28, 28, 28)
+local TEXT_COL = Color3.fromRGB(220, 220, 220)
+
+local tabFrames   = {}
+local tabButtons  = {}
+local activeTab   = nil
+
+local function MakeTab(name, order)
+    local btn = Instance.new("TextButton")
+    btn.Text            = name
+    btn.Font            = Enum.Font.GothamSemibold
+    btn.TextSize        = 11
+    btn.TextColor3      = Color3.fromRGB(160,160,160)
+    btn.Size            = UDim2.new(0, 56, 1, -4)
+    btn.BackgroundColor3= Color3.fromRGB(30,30,30)
+    btn.BorderSizePixel = 0
+    btn.LayoutOrder     = order
+    btn.Parent          = TabBar
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,4)
+
+    local frame = Instance.new("Frame")
+    frame.Name            = name
+    frame.Size            = UDim2.new(1,0,1,0)
+    frame.BackgroundTransparency = 1
+    frame.Visible         = false
+    frame.Parent          = ContentFrame
+
+    local fl = Instance.new("UIListLayout")
+    fl.SortOrder  = Enum.SortOrder.LayoutOrder
+    fl.Padding    = UDim.new(0,4)
+    fl.Parent     = frame
+
+    tabFrames[name]  = frame
+    tabButtons[name] = btn
+
+    btn.MouseButton1Click:Connect(function()
+        for k, f in pairs(tabFrames) do
+            f.Visible = false
+            tabButtons[k].TextColor3      = Color3.fromRGB(160,160,160)
+            tabButtons[k].BackgroundColor3= Color3.fromRGB(30,30,30)
+        end
+        frame.Visible      = true
+        btn.TextColor3      = Color3.fromRGB(255,255,255)
+        btn.BackgroundColor3= ACCENT
+        activeTab = name
+    end)
+
+    return frame
+end
+
+local function Card(parent, order)
+    local f = Instance.new("Frame")
+    f.Size             = UDim2.new(1, 0, 0, 0)
+    f.AutomaticSize    = Enum.AutomaticSize.Y
+    f.BackgroundColor3 = BG_CARD
+    f.BorderSizePixel  = 0
+    f.LayoutOrder      = order or 0
+    f.Parent           = parent
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0,6)
+    local pad = Instance.new("UIPadding", f)
+    pad.PaddingLeft   = UDim.new(0,8)
+    pad.PaddingRight  = UDim.new(0,8)
+    pad.PaddingTop    = UDim.new(0,6)
+    pad.PaddingBottom = UDim.new(0,6)
+    local fl = Instance.new("UIListLayout", f)
+    fl.SortOrder = Enum.SortOrder.LayoutOrder
+    fl.Padding   = UDim.new(0,4)
+    return f
+end
+
+local function Label(parent, text, order)
+    local l = Instance.new("TextLabel")
+    l.Text              = text
+    l.Font              = Enum.Font.GothamSemibold
+    l.TextSize          = 12
+    l.TextColor3        = TEXT_COL
+    l.Size              = UDim2.new(1,0,0,18)
+    l.BackgroundTransparency = 1
+    l.TextXAlignment    = Enum.TextXAlignment.Left
+    l.LayoutOrder       = order or 0
+    l.Parent            = parent
+    return l
+end
+
+local function SubLabel(parent, text, order)
+    local l = Label(parent, text, order)
+    l.TextSize   = 10
+    l.TextColor3 = Color3.fromRGB(130,130,130)
+    return l
+end
+
+local function Toggle(parent, labelText, stateKey, callback, order)
+    local row = Instance.new("Frame")
+    row.Size             = UDim2.new(1,0,0,26)
+    row.BackgroundTransparency = 1
+    row.LayoutOrder      = order or 0
+    row.Parent           = parent
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Text             = labelText
+    lbl.Font             = Enum.Font.Gotham
+    lbl.TextSize         = 12
+    lbl.TextColor3       = TEXT_COL
+    lbl.Size             = UDim2.new(1,-44,1,0)
+    lbl.BackgroundTransparency = 1
+    lbl.TextXAlignment   = Enum.TextXAlignment.Left
+    lbl.Parent           = row
+
+    local togBtn = Instance.new("TextButton")
+    togBtn.Size          = UDim2.new(0,36,0,20)
+    togBtn.Position      = UDim2.new(1,-38,0.5,-10)
+    togBtn.Text          = ""
+    togBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    togBtn.BorderSizePixel  = 0
+    togBtn.Parent        = row
+    Instance.new("UICorner", togBtn).CornerRadius = UDim.new(1,0)
+
+    local knob = Instance.new("Frame")
+    knob.Size            = UDim2.new(0,16,0,16)
+    knob.Position        = UDim2.new(0,2,0.5,-8)
+    knob.BackgroundColor3= Color3.fromRGB(200,200,200)
+    knob.BorderSizePixel = 0
+    knob.Parent          = togBtn
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
+
+    local function Refresh()
+        local on = stateKey and State[stateKey]
+        togBtn.BackgroundColor3 = on and ACCENT or Color3.fromRGB(60,60,60)
+        TweenService:Create(knob, TweenInfo.new(0.12), {
+            Position = on and UDim2.new(1,-18,0.5,-8) or UDim2.new(0,2,0.5,-8)
+        }):Play()
+    end
+    Refresh()
+
+    togBtn.MouseButton1Click:Connect(function()
+        if stateKey then State[stateKey] = not State[stateKey] end
+        Refresh()
+        if callback then callback(stateKey and State[stateKey]) end
+    end)
+    return togBtn
+end
+
+local function Slider(parent, labelText, min, max, stateKey, order)
+    local col = Instance.new("Frame")
+    col.Size             = UDim2.new(1,0,0,0)
+    col.AutomaticSize    = Enum.AutomaticSize.Y
+    col.BackgroundTransparency = 1
+    col.LayoutOrder      = order or 0
+    col.Parent           = parent
+    local cfl = Instance.new("UIListLayout", col)
+    cfl.Padding = UDim.new(0,2)
+
+    local topRow = Instance.new("Frame")
+    topRow.Size  = UDim2.new(1,0,0,16)
+    topRow.BackgroundTransparency = 1
+    topRow.Parent = col
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Text  = labelText
+    lbl.Font  = Enum.Font.Gotham
+    lbl.TextSize = 12
+    lbl.TextColor3 = TEXT_COL
+    lbl.Size  = UDim2.new(0.7,0,1,0)
+    lbl.BackgroundTransparency = 1
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = topRow
+
+    local valLabel = Instance.new("TextLabel")
+    valLabel.Font  = Enum.Font.GothamSemibold
+    valLabel.TextSize = 11
+    valLabel.TextColor3 = ACCENT
+    valLabel.Size  = UDim2.new(0.3,0,1,0)
+    valLabel.Position = UDim2.new(0.7,0,0,0)
+    valLabel.BackgroundTransparency = 1
+    valLabel.TextXAlignment = Enum.TextXAlignment.Right
+    valLabel.Text  = tostring(State[stateKey])
+    valLabel.Parent = topRow
+
+    local track = Instance.new("Frame")
+    track.Size             = UDim2.new(1,0,0,6)
+    track.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    track.BorderSizePixel  = 0
+    track.Parent           = col
+    Instance.new("UICorner", track).CornerRadius = UDim.new(1,0)
+
+    local fill = Instance.new("Frame")
+    fill.Size             = UDim2.new((State[stateKey]-min)/(max-min),0,1,0)
+    fill.BackgroundColor3 = ACCENT
+    fill.BorderSizePixel  = 0
+    fill.Parent           = track
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(1,0)
+
+    local dragging = false
+    track.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1
+        or i.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1
+        or i.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(i)
+        if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
+        or i.UserInputType == Enum.UserInputType.Touch) then
+            local abs = track.AbsolutePosition
+            local sz  = track.AbsoluteSize
+            local rel = math.clamp((i.Position.X - abs.X) / sz.X, 0, 1)
+            local val = math.floor(min + rel*(max-min))
+            State[stateKey] = val
+            fill.Size       = UDim2.new(rel,0,1,0)
+            valLabel.Text   = tostring(val)
+        end
+    end)
+
+    return col
+end
+
+local function Dropdown(parent, labelText, options, stateKey, order)
+    local col = Instance.new("Frame")
+    col.Size          = UDim2.new(1,0,0,0)
+    col.AutomaticSize = Enum.AutomaticSize.Y
+    col.BackgroundTransparency = 1
+    col.LayoutOrder   = order or 0
+    col.Parent        = parent
+    local cfl = Instance.new("UIListLayout", col); cfl.Padding = UDim.new(0,2)
+
+    local lbl = Label(col, labelText)
+    lbl.TextSize = 11
+
+    local btn = Instance.new("TextButton")
+    btn.Text            = State[stateKey] or options[1]
+    btn.Font            = Enum.Font.Gotham
+    btn.TextSize        = 11
+    btn.TextColor3      = TEXT_COL
+    btn.Size            = UDim2.new(1,0,0,24)
+    btn.BackgroundColor3= Color3.fromRGB(38,38,38)
+    btn.BorderSizePixel = 0
+    btn.Parent          = col
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,4)
+
+    local listFrame = Instance.new("Frame")
+    listFrame.Size          = UDim2.new(1,0,0,0)
+    listFrame.AutomaticSize = Enum.AutomaticSize.Y
+    listFrame.BackgroundColor3 = Color3.fromRGB(38,38,38)
+    listFrame.BorderSizePixel  = 0
+    listFrame.Visible          = false
+    listFrame.ZIndex           = 10
+    listFrame.Parent           = col
+    Instance.new("UICorner", listFrame).CornerRadius = UDim.new(0,4)
+    local lfl = Instance.new("UIListLayout", listFrame)
+    lfl.SortOrder = Enum.SortOrder.LayoutOrder
+
+    for i, opt in ipairs(options) do
+        local ob = Instance.new("TextButton")
+        ob.Text            = opt
+        ob.Font            = Enum.Font.Gotham
+        ob.TextSize        = 11
+        ob.TextColor3      = TEXT_COL
+        ob.Size            = UDim2.new(1,0,0,22)
+        ob.BackgroundTransparency = 1
+        ob.BorderSizePixel = 0
+        ob.LayoutOrder     = i
+        ob.ZIndex          = 11
+        ob.Parent          = listFrame
+        ob.MouseButton1Click:Connect(function()
+            if stateKey then State[stateKey] = opt end
+            btn.Text       = opt
+            listFrame.Visible = false
+        end)
+    end
+
+    btn.MouseButton1Click:Connect(function()
+        listFrame.Visible = not listFrame.Visible
+    end)
+    return col
+end
+
+local function Button(parent, text, callback, order)
+    local btn = Instance.new("TextButton")
+    btn.Text            = text
+    btn.Font            = Enum.Font.GothamSemibold
+    btn.TextSize        = 12
+    btn.TextColor3      = Color3.fromRGB(255,255,255)
+    btn.Size            = UDim2.new(1,0,0,26)
+    btn.BackgroundColor3= ACCENT
+    btn.BorderSizePixel = 0
+    btn.LayoutOrder     = order or 0
+    btn.Parent          = parent
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,5)
+    btn.MouseButton1Click:Connect(function() if callback then callback() end end)
+    return btn
+end
+
+-- ════════════════════════════════════════
+--           TABS
+-- ════════════════════════════════════════
+local tabMain    = MakeTab("Main",    1)
+local tabPlayer  = MakeTab("Player",  2)
+local tabDungeon = MakeTab("Dungeon", 3)
+local tabTower   = MakeTab("Tower",   4)
+local tabForge   = MakeTab("Forge",   5)
+local tabSell    = MakeTab("Sell",    6)
+
+-- activate Main by default
+tabButtons["Main"].TextColor3       = Color3.fromRGB(255,255,255)
+tabButtons["Main"].BackgroundColor3 = ACCENT
+tabFrames["Main"].Visible           = true
+activeTab = "Main"
+
+-- ════════════════════════════════════════
+--           TAB: MAIN
+-- ════════════════════════════════════════
+do
+    local c = Card(tabMain, 1)
+    Label(c, "🔄  Auto Rebirth", 1)
+    Toggle(c, "Auto Rebirth", "AutoRebirth", nil, 2)
+    Button(c, "Rebirth Now", function()
+        -- fires Rebirth RemoteEvent; name may vary per game
+        local re = game:GetService("ReplicatedStorage"):FindFirstChild("Rebirth")
+            or game:GetService("ReplicatedStorage"):FindFirstChild("DoRebirth")
+        if re then re:FireServer() end
+    end, 3)
+end
+
+do
+    local c = Card(tabMain, 2)
+    Label(c, "⬆️  Auto Buy Upgrades", 1)
+    Toggle(c, "Auto Buy Upgrades", "AutoBuyUpgrades", nil, 2)
+    SubLabel(c, "Upgrades To Buy", 3)
+    local inp = Instance.new("TextBox")
+    inp.PlaceholderText  = "e.g. Strength, Speed"
+    inp.Text             = State.UpgradesToBuy
+    inp.Font             = Enum.Font.Gotham
+    inp.TextSize         = 11
+    inp.TextColor3       = TEXT_COL
+    inp.PlaceholderColor3= Color3.fromRGB(90,90,90)
+    inp.Size             = UDim2.new(1,0,0,24)
+    inp.BackgroundColor3 = Color3.fromRGB(38,38,38)
+    inp.BorderSizePixel  = 0
+    inp.LayoutOrder      = 4
+    inp.ClearTextOnFocus = false
+    inp.Parent           = c
+    Instance.new("UICorner", inp).CornerRadius = UDim.new(0,4)
+    inp.FocusLost:Connect(function() State.UpgradesToBuy = inp.Text end)
+    Button(c, "Buy Upgrade Now", function()
+        -- stub: game-specific upgrade remote
+    end, 5)
+end
+
+do
+    local c = Card(tabMain, 3)
+    Label(c, "🏋️  Auto Train", 1)
+    Toggle(c, "Auto Train", "AutoTrain", nil, 2)
+    Dropdown(c, "Train Area", {
+        "Area 1 (Rebirth 0)","Area 2","Area 3","Area 4","Area 5"
+    }, "TrainArea", 3)
+    Slider(c, "Clicks Per Second", 1, 20, "ClicksPerSec", 4)
+end
+
+-- ════════════════════════════════════════
+--           TAB: PLAYER
+-- ════════════════════════════════════════
+do
+    local c = Card(tabPlayer, 1)
+    Label(c, "🏃  Movement", 1)
+    Slider(c, "Walk Speed", 16, 250, "WalkSpeed", 2)
+    Slider(c, "Fly Speed",  10, 400, "FlySpeed",  3)
+    Toggle(c, "Fly", "IsFlying", function(on)
+        -- handled in RunService loop
+    end, 4)
+end
+
+do
+    local c = Card(tabPlayer, 2)
+    Label(c, "🦘  Misc Player", 1)
+    Toggle(c, "Infinite Jump",    "InfiniteJump",    nil, 2)
+    Toggle(c, "No Clip",          "NoClip",          nil, 3)
+    Toggle(c, "Instant Proximity","InstantProximpt", nil, 4)
+end
+
+-- ════════════════════════════════════════
+--           TAB: DUNGEON
+-- ════════════════════════════════════════
+do
+    local c = Card(tabDungeon, 1)
+    Label(c, "⚔️  Auto Farm Dungeon", 1)
+    SubLabel(c, "Idle | Pack 0/13 | Clears 0 | Kills 0 | Ore 0", 2)
+    Toggle(c, "Auto Farm Dungeon",    "AutoDungeon",     nil, 3)
+    Toggle(c, "Force Kill Stage Enemies","ForceKillDungEn",nil, 4)
+    Dropdown(c, "Stage", {
+        "Stage 1","Stage 2","Stage 3","Stage 4","Stage 5",
+        "Stage 6","Stage 7","Stage 8","Stage 9","Stage 10",
+        "Stage 24","Stage 25","Stage 26","Stage 27"
+    }, "DungeonStage", 5)
+    Button(c, "Exit Forge Now", function()
+        -- teleport back to lobby remote / WalkTo spawn
+        local spawn = workspace:FindFirstChild("SpawnLocation")
+        if spawn and RootPart then
+            RootPart.CFrame = spawn.CFrame + Vector3.new(0,5,0)
+        end
+    end, 6)
+end
+
+-- ════════════════════════════════════════
+--           TAB: TOWER
+-- ════════════════════════════════════════
+do
+    local c = Card(tabTower, 1)
+    Label(c, "🗼  Auto Farm Tower", 1)
+    SubLabel(c, "Idle | Runs 0 | Cleared Round 21", 2)
+    Toggle(c, "Auto Farm Tower",       "AutoTower",      nil, 3)
+    Toggle(c, "Farm Rounds In Order",  "FarmRoundsOrder",nil, 4)
+    Toggle(c, "Force Kill Tower Enemies","ForceKillTowEn",nil, 5)
+    Dropdown(c, "Start Round", {
+        "Round 1","Round 5","Round 10","Round 15","Round 20","Round 25"
+    }, "TowerRound", 6)
+    Button(c, "Claim Daily Ticket", function()
+        local re = game:GetService("ReplicatedStorage"):FindFirstChild("ClaimDailyTicket")
+        if re then re:FireServer() end
+    end, 7)
+end
+
+-- ════════════════════════════════════════
+--           TAB: FORGE
+-- ════════════════════════════════════════
+do
+    local c = Card(tabForge, 1)
+    Label(c, "🔨  Auto Forge", 1)
+    SubLabel(c, "Great Sword | Forged 0 | Clicks 0\nWeapon | 13 ore | 100% class roll", 2)
+    Toggle(c, "Auto Forge",         "AutoForge",      nil, 3)
+    Toggle(c, "Spend Best One First","ForgeSpendBest", nil, 4)
+    Dropdown(c, "Target Gear", {
+        "Great Sword","Shield","Bow","Staff","Dagger","Axe"
+    }, "ForgeTarget", 5)
+    Dropdown(c, "Auto Forge (Gear)", {
+        "Weapon","Armor","Accessory"
+    }, "ForgeGear", 6)
+    Dropdown(c, "Ore Rarity Filter", {
+        "One","Two","Three","Four","Five"
+    }, "ForgeRarity", 7)
+    Button(c, "Forge Now", function()
+        local re = game:GetService("ReplicatedStorage"):FindFirstChild("ForgeItem")
+        if re then re:FireServer(State.ForgeTarget, State.ForgeGear) end
+    end, 8)
+end
+
+-- ════════════════════════════════════════
+--           TAB: SELL
+-- ════════════════════════════════════════
+do
+    local c = Card(tabSell, 1)
+    Label(c, "💰  Auto Sell", 1)
+    SubLabel(c, "Pauses while a dungeon or tower run is active", 2)
+    Toggle(c, "Auto Sell",       "AutoSell",       nil, 3)
+    Toggle(c, "Sell Item Types", "SellItemTypes",  nil, 4)
+    Dropdown(c, "Sell Rarity Filter", {
+        "One","Two","Three","Four","Five"
+    }, "SellRarityFilter", 5)
+    Slider(c, "Keep Per Item", 0, 50, "KeepPerItem", 6)
+    Button(c, "Sell All Now", function()
+        local re = game:GetService("ReplicatedStorage"):FindFirstChild("SellAll")
+            or game:GetService("ReplicatedStorage"):FindFirstChild("SellItems")
+        if re then re:FireServer() end
+    end, 7)
+end
+
+-- ════════════════════════════════════════
+--           DISCORD PANEL (every tab footer)
+-- ════════════════════════════════════════
+local DiscordBar = Instance.new("Frame")
+DiscordBar.Size             = UDim2.new(1,0,0,28)
+DiscordBar.Position         = UDim2.new(0,0,1,-28)
+DiscordBar.BackgroundColor3 = Color3.fromRGB(24,24,24)
+DiscordBar.BorderSizePixel  = 0
+DiscordBar.Parent           = MainFrame
+
+local DiscordLbl = Instance.new("TextLabel")
+DiscordLbl.Text           = "Join Discord to Make Money"
+DiscordLbl.Font           = Enum.Font.Gotham
+DiscordLbl.TextSize       = 10
+DiscordLbl.TextColor3     = Color3.fromRGB(130,130,255)
+DiscordLbl.Size           = UDim2.new(1,0,1,0)
+DiscordLbl.BackgroundTransparency = 1
+DiscordLbl.TextXAlignment = Enum.TextXAlignment.Center
+DiscordLbl.Parent         = DiscordBar
+
+-- ════════════════════════════════════════
+--           RUNTIME LOGIC
+-- ════════════════════════════════════════
+
+-- Fly body movers
+local BodyVelocity, BodyGyro
+local function StartFly()
+    if not RootPart then return end
+    BodyVelocity = Instance.new("BodyVelocity")
+    BodyVelocity.MaxForce   = Vector3.new(1e5,1e5,1e5)
+    BodyVelocity.Velocity   = Vector3.new(0,0,0)
+    BodyVelocity.Parent     = RootPart
+
+    BodyGyro = Instance.new("BodyGyro")
+    BodyGyro.MaxTorque = Vector3.new(1e5,1e5,1e5)
+    BodyGyro.CFrame    = RootPart.CFrame
+    BodyGyro.Parent    = RootPart
+end
+local function StopFly()
+    if BodyVelocity then BodyVelocity:Destroy(); BodyVelocity = nil end
+    if BodyGyro     then BodyGyro:Destroy();     BodyGyro     = nil end
+    if Humanoid then Humanoid.PlatformStand = false end
+end
+
+RunService.Heartbeat:Connect(function()
+    Character = LocalPlayer.Character
+    if not Character then return end
+    Humanoid = Character:FindFirstChildOfClass("Humanoid")
+    RootPart = Character:FindFirstChild("HumanoidRootPart")
+    if not Humanoid or not RootPart then return end
+
+    -- Walk speed
+    Humanoid.WalkSpeed = State.WalkSpeed
+
+    -- Fly
+    if State.IsFlying then
+        if not BodyVelocity then StartFly() end
+        Humanoid.PlatformStand = true
+        local cam   = workspace.CurrentCamera
+        local dir   = Vector3.new(0,0,0)
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            dir = dir + cam.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            dir = dir - cam.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            dir = dir - cam.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            dir = dir + cam.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            dir = dir + Vector3.new(0,1,0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+            dir = dir - Vector3.new(0,1,0)
+        end
+        if BodyVelocity then
+            BodyVelocity.Velocity = dir.Magnitude > 0
+                and dir.Unit * State.FlySpeed
+                or  Vector3.new(0,0,0)
+        end
+        if BodyGyro then
+            BodyGyro.CFrame = cam.CFrame
+        end
+    else
+        if BodyVelocity then StopFly() end
+    end
+
+    -- No clip
+    if State.NoClip then
+        for _, part in ipairs(Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+
+    -- Instant proximity prompts
+    if State.InstantProximpt then
+        for _, v in ipairs(workspace:GetDescendants()) do
+            if v:IsA("ProximityPrompt") then
+                v.HoldDuration     = 0
+                v.MaxActivationDistance = 9999
+            end
+        end
+    end
+
+    -- Auto Sell (pauses during dungeon/tower — check state flags)
+    if State.AutoSell and not State.AutoDungeon and not State.AutoTower then
+        local re = game:GetService("ReplicatedStorage"):FindFirstChild("SellAll")
+            or game:GetService("ReplicatedStorage"):FindFirstChild("SellItems")
+        if re then
+            re:FireServer()
+        end
+    end
+end)
+
+-- Infinite Jump
+UserInputService.JumpRequest:Connect(function()
+    if State.InfiniteJump and Humanoid then
+        Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+-- Auto loops (throttled with task.wait)
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        if not LocalPlayer.Character then continue end
+
+        -- Auto Rebirth
+        if State.AutoRebirth then
+            local re = game:GetService("ReplicatedStorage"):FindFirstChild("Rebirth")
+                or game:GetService("ReplicatedStorage"):FindFirstChild("DoRebirth")
+            if re then re:FireServer() end
+        end
+
+        -- Auto Buy Upgrades
+        if State.AutoBuyUpgrades then
+            local re = game:GetService("ReplicatedStorage"):FindFirstChild("BuyUpgrade")
+            if re then re:FireServer(State.UpgradesToBuy) end
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(1/math.max(State.ClicksPerSec,1))
+        if State.AutoTrain then
+            local re = game:GetService("ReplicatedStorage"):FindFirstChild("Train")
+                or game:GetService("ReplicatedStorage"):FindFirstChild("DoTrain")
+            if re then re:FireServer(State.TrainArea) end
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if State.AutoForge then
+            local re = game:GetService("ReplicatedStorage"):FindFirstChild("ForgeItem")
+            if re then re:FireServer(State.ForgeTarget, State.ForgeGear) end
+        end
+        if State.AutoDungeon then
+            local re = game:GetService("ReplicatedStorage"):FindFirstChild("FarmDungeon")
+                or game:GetService("ReplicatedStorage"):FindFirstChild("StartDungeon")
+            if re then re:FireServer(State.DungeonStage) end
+        end
+        if State.AutoTower then
+            local re = game:GetService("ReplicatedStorage"):FindFirstChild("FarmTower")
+                or game:GetService("ReplicatedStorage"):FindFirstChild("StartTower")
+            if re then re:FireServer(State.TowerRound) end
+        end
+    end
+end)
+
+-- Keybind: INSERT to toggle visibility
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.Insert
+    or input.KeyCode == Enum.KeyCode.RightBracket then
+        MainFrame.Visible = not MainFrame.Visible
+    end
+end)
+
+print("[PrimoDax Hub] Loaded — Created By: BoboyTagaAquarius")
