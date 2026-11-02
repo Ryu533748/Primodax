@@ -4,7 +4,7 @@
 -- ██╔═══╝ ██╔══██╗██║██║╚██╔╝██║██║   ██║██║  ██║██╔══██║ ██╔██╗
 -- ██║     ██║  ██║██║██║ ╚═╝ ██║╚██████╔╝██████╔╝██║  ██║██╔╝ ██╗
 -- ╚═╝     ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
--- VAGRANT SURVIVAL v10.5 | CLEAN FIX
+-- VAGRANT SURVIVAL v10.6 | DELTA VISIBILITY FIX
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -224,12 +224,13 @@ local function doTeleportBag()
     end
 end
 
--- ============ UI SYSTEM (DELTA FIX) ============
+-- ============ UI SYSTEM (DELTA VISIBILITY FIX) ============
 local parentGui = gethui and gethui() or CoreGui
 if parentGui:FindFirstChild("VagrantSurvivalUI") then parentGui:FindFirstChild("VagrantSurvivalUI"):Destroy() end
 
 local SG = Instance.new("ScreenGui")
-SG.Name = "VagrantSurvivalUI"; SG.ResetOnSpawn = false; SG.IgnoreGuiInset = true; SG.Parent = parentGui
+SG.Name = "VagrantSurvivalUI"; SG.ResetOnSpawn = false; SG.IgnoreGuiInset = true; SG.DisplayOrder = 999; SG.Parent = parentGui
+if protect_gui then pcall(protect_gui, SG) end
 
 local FloatBtn = Instance.new("TextButton")
 FloatBtn.Size = UDim2.new(0, 40, 0, 40); FloatBtn.Position = UDim2.new(0, 20, 0, 20)
