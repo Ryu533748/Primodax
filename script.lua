@@ -4,7 +4,7 @@
 -- ██╔═══╝ ██╔══██╗██║██║╚██╔╝██║██║   ██║██║  ██║██╔══██║ ██╔██╗
 -- ██║     ██║  ██║██║██║ ╚═╝ ██║╚██████╔╝██████╔╝██║  ██║██╔╝ ██╗
 -- ╚═╝     ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
--- PRIMODAX VGRANT v6.7 | FINAL FIX: Crossbow, Fly Jump, Bag TP
+-- PRIMODAX VGRANT v7.0 | LANDSCAPE + BG IMAGE | Created By: BoboyTagaAquarius
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -36,7 +36,7 @@ local function getRoot(p) local c = getChar(p) return c and c:FindFirstChild("Hu
 local function getPart(p, n) local c = getChar(p) return c and c:FindFirstChild(n) end
 local function isAlive(p) local h = getHum(p) return h and h.Health > 0 end
 
--- ============ WIDE SCREEN (CAMERA FOV) ============
+-- ============ WIDE SCREEN ============
 local function updateCameraFOV()
     if CFG.WideScreen then Cam.FieldOfView = CFG.CameraFOV else Cam.FieldOfView = 70 end
 end
@@ -157,52 +157,31 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ============ WEAPON FORCE RELOAD FIX (V6.7) ============
-local lastReloadAttempt = 0
+-- ============ V6.2 RELOAD LOGIC ============
 RunService.Heartbeat:Connect(function()
     if not CFG.UnlimitedAmmo and not CFG.AutoReload then return end
-    local char = getChar(LP)
-    if not char then return end
-    local tool = char:FindFirstChildOfClass("Tool")
-    if not tool then return end
-
-    -- Infinite Ammo Logic (Attributes & Values)
-    if CFG.UnlimitedAmmo then
-        local ammoAttr = tool:GetAttribute("Ammo") or tool:GetAttribute("CurrentAmmo") or tool:GetAttribute("StoredAmmo")
-        if ammoAttr and type(ammoAttr) == "number" and ammoAttr < 5 then
-            tool:SetAttribute("Ammo", 999)
-            tool:SetAttribute("CurrentAmmo", 999)
-            tool:SetAttribute("StoredAmmo", 999)
-        end
-        for _, v in ipairs(tool:GetDescendants()) do
-            local n = v.Name:lower()
-            if (v:IsA("IntValue") or v:IsA("NumberValue")) and (n:find("ammo") or n:find("bullet") or n:find("mag") or n:find("bolt")) then
+    local char = getChar(LP) if not char then return end
+    local tool = char:FindFirstChildOfClass("Tool") if not tool then return end
+    for _, v in ipairs(tool:GetDescendants()) do
+        local n = v.Name:lower()
+        if (v:IsA("IntValue") or v:IsA("NumberValue")) then
+            if CFG.UnlimitedAmmo and (n:find("ammo") or n:find("bullet") or n:find("mag") or n:find("bolt")) then
                 if v.Value < 5 then v.Value = 999 end
             end
-        end
-    end
-
-    -- Auto Reload (Crossbow) - Pilitin i-activate ang tool
-    if CFG.AutoReload and tick() - lastReloadAttempt > 1 then
-        local isReloading = tool:GetAttribute("Reloading") or tool:GetAttribute("IsReloading")
-        local currentAmmo = tool:GetAttribute("Ammo") or tool:GetAttribute("CurrentAmmo")
-        
-        -- Kapag kulang sa bala o nagre-reload, i-activate natin ang tool (parang pinindot mo yung screen)
-        if isReloading == true or (currentAmmo and currentAmmo <= 0) then
-            pcall(function() tool:Activate() end)
-            -- Fallback: I-unequip at i-equip para mag-reset
-            local hum = getHum(LP)
-            if hum then
-                hum:UnequipTools()
-                task.wait(0.1)
-                hum:EquipTool(tool)
+            if CFG.AutoReload and (n:find("reload") or n:find("reloading")) then
+                if v.Value == 1 then v.Value = 0 end
             end
-            lastReloadAttempt = tick()
+        end
+        if v:IsA("BoolValue") then
+            local bn = v.Name:lower()
+            if CFG.AutoReload and (bn:find("reload") or bn:find("reloading")) then
+                v.Value = false
+            end
         end
     end
 end)
 
--- ============ MOVEMENT (INF JUMP FLY FIX) ============
+-- ============ MOVEMENT (INF JUMP FLY) ============
 RunService.Heartbeat:Connect(function()
     local char = getChar(LP)
     if not char then return end
@@ -210,21 +189,17 @@ RunService.Heartbeat:Connect(function()
     local root = getRoot(LP)
     if not hum or not root then return end
 
-    -- Auto Sprint
     if CFG.AutoSprint then
         if hum.WalkSpeed < CFG.SprintSpeed then hum.WalkSpeed = CFG.SprintSpeed end
     elseif hum.WalkSpeed == CFG.SprintSpeed then
         hum.WalkSpeed = 16
     end
 
-    -- Infinite Jump (Velocity Injection para talagang lilipad)
     if CFG.InfiniteJump then
         local isJumping = UserInputService:IsKeyDown(Enum.KeyCode.Space) or 
                           UserInputService:IsKeyDown(Enum.KeyCode.ButtonA) or
                           (UserInputService.TouchEnabled and hum:GetState() == Enum.HumanoidStateType.Jumping)
-        
         if isJumping then
-            -- Direktang dagdagan ang Y velocity para pataas nang pataas
             root.Velocity = Vector3.new(root.Velocity.X, 50, root.Velocity.Z)
         end
     end
@@ -254,7 +229,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ============ AUTO RESPAWN & OWN BAG TELEPORT (V6.7 FIX) ============
+-- ============ AUTO RESPAWN & BAG TP ============
 local function clickRespawnUI()
     local guis = {CoreGui, LP:WaitForChild("PlayerGui")}
     for _, gui in ipairs(guis) do
@@ -271,18 +246,13 @@ local function clickRespawnUI()
 end
 
 local function findMyBag()
-    -- Mas malalim na paghahanap: ini-scan pati loob ng Models/Folders sa buong Workspace
     local myName = LP.Name:lower()
     local myId = tostring(LP.UserId)
-    
     for _, obj in ipairs(Workspace:GetDescendants()) do
         local n = obj.Name:lower()
-        -- Kung may pangalan mo, o may UserId mo, o "bag" na malapit sayo
         if n:find(myName) or n:find(myId) or n:find("bag") or n:find("loot_drop") then
             local part = obj:IsA("BasePart") and obj or obj:FindFirstChildOfClass("BasePart")
-            if part and part.Position.Magnitude > 0 then -- valid position
-                return part
-            end
+            if part and part.Position.Magnitude > 0 then return part end
         end
     end
     return nil
@@ -293,25 +263,18 @@ LP.CharacterAdded:Connect(function(char)
     if hum then
         hum.Died:Connect(function()
             if not CFG.AutoRespawn then return end
-            
-            -- 1. Auto Click Respawn UI
             for i = 1, 15 do task.wait(1); clickRespawnUI() end
-            
-            -- 2. Teleport to Own Bag
             if CFG.RespawnToBag then
-                task.wait(2) -- Hintayin mag-load ang character
+                task.wait(2)
                 local newRoot = getRoot(LP)
                 local myBag = findMyBag()
-                if newRoot and myBag then 
-                    newRoot.CFrame = myBag.CFrame + Vector3.new(0, 5, 0) 
-                    print("Teleported to bag:", myBag:GetFullName())
-                end
+                if newRoot and myBag then newRoot.CFrame = myBag.CFrame + Vector3.new(0, 5, 0) end
             end
         end)
     end
 end)
 
--- ============ UI SYSTEM ============
+-- ============ UI SYSTEM (LANDSCAPE + BG) ============
 if CoreGui:FindFirstChild("PrimodaxGUI") then CoreGui:FindFirstChild("PrimodaxGUI"):Destroy() end
 local SG = Instance.new("ScreenGui")
 SG.Name = "PrimodaxGUI"
@@ -320,54 +283,102 @@ SG.IgnoreGuiInset = true
 SG.Parent = CoreGui
 
 local MF = Instance.new("Frame")
-MF.Size = UDim2.fromOffset(300, 580)
-MF.Position = UDim2.new(0.5, -150, 0.5, -290)
+MF.Size = UDim2.new(0, 550, 0, 300) -- Landscape Size
+MF.Position = UDim2.new(0.5, -275, 0.5, -150)
 MF.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 MF.BorderSizePixel = 0
+MF.Active = true
 MF.Visible = false
 MF.Parent = SG
 Instance.new("UICorner", MF).CornerRadius = UDim.new(0, 12)
 local mfStroke = Instance.new("UIStroke", MF); mfStroke.Color = Color3.fromRGB(255, 215, 0); mfStroke.Thickness = 1.5
 
+-- Background Image (ID: 118004643139453)
+local bgImg = Instance.new("ImageLabel")
+bgImg.Size = UDim2.new(1, 0, 1, 0)
+bgImg.Position = UDim2.new(0, 0, 0, 0)
+bgImg.BackgroundTransparency = 1
+bgImg.Image = "rbxassetid://118004643139453" 
+bgImg.ScaleType = Enum.ScaleType.Crop
+bgImg.ZIndex = 1
+bgImg.Parent = MF
+Instance.new("UICorner", bgImg).CornerRadius = UDim.new(0, 12)
+
+-- Dark Overlay
+local overlay = Instance.new("Frame")
+overlay.Size = UDim2.new(1, 0, 1, 0)
+overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+overlay.BackgroundTransparency = 0.65 
+overlay.ZIndex = 2
+overlay.Parent = MF
+Instance.new("UICorner", overlay).CornerRadius = UDim.new(0, 12)
+
+-- Draggable Logic
+local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
+MF.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MF.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+MF.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        MF.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- HEADER
 local TB = Instance.new("Frame")
-TB.Size = UDim2.new(1, 0, 0, 55); TB.BackgroundColor3 = Color3.fromRGB(255, 215, 0); TB.Parent = MF
+TB.Size = UDim2.new(1, 0, 0, 50); TB.BackgroundColor3 = Color3.fromRGB(255, 215, 0); TB.BackgroundTransparency = 0.2; TB.ZIndex = 3; TB.Parent = MF
 Instance.new("UICorner", TB).CornerRadius = UDim.new(0, 12)
 
 local TL = Instance.new("TextLabel")
-TL.Size = UDim2.new(1, -50, 0, 30); TL.Position = UDim2.new(0, 10, 0, 5); TL.BackgroundTransparency = 1
-TL.Text = "⚡ PRIMODAX VGRANT ⚡"; TL.TextColor3 = Color3.fromRGB(0, 0, 0); TL.TextSize = 15; TL.Font = Enum.Font.GothamBold; TL.TextXAlignment = Enum.TextXAlignment.Left; TL.Parent = TB
+TL.Size = UDim2.new(1, -50, 0, 25); TL.Position = UDim2.new(0, 10, 0, 2); TL.BackgroundTransparency = 1
+TL.Text = "Vagrant Survival v10"; TL.TextColor3 = Color3.fromRGB(0, 0, 0); TL.TextSize = 16; TL.Font = Enum.Font.GothamBold; TL.TextXAlignment = Enum.TextXAlignment.Left; TL.ZIndex = 4; TL.Parent = TB
 
 local SUB = Instance.new("TextLabel")
-SUB.Size = UDim2.new(1, -50, 0, 15); SUB.Position = UDim2.new(0, 10, 0, 28); SUB.BackgroundTransparency = 1
-SUB.Text = "Vagrant Survival v10 | By: BoboyTagaAquarius"; SUB.TextColor3 = Color3.fromRGB(30, 30, 30); SUB.TextSize = 10; SUB.Font = Enum.Font.Gotham; SUB.TextXAlignment = Enum.TextXAlignment.Left; SUB.Parent = TB
+SUB.Size = UDim2.new(1, -50, 0, 15); SUB.Position = UDim2.new(0, 10, 0, 25); SUB.BackgroundTransparency = 1
+SUB.Text = "Created By: BoboyTagaAquarius"; SUB.TextColor3 = Color3.fromRGB(30, 30, 30); SUB.TextSize = 11; SUB.Font = Enum.Font.Gotham; SUB.TextXAlignment = Enum.TextXAlignment.Left; SUB.ZIndex = 4; SUB.Parent = TB
 
 local XBtn = Instance.new("TextButton")
-XBtn.Size = UDim2.new(0, 36, 0, 36); XBtn.Position = UDim2.new(1, -42, 0, 10); XBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30); XBtn.Text = "✕"; XBtn.TextColor3 = Color3.fromRGB(255, 215, 0); XBtn.TextSize = 16; XBtn.Font = Enum.Font.GothamBold; XBtn.Parent = TB
+XBtn.Size = UDim2.new(0, 36, 0, 36); XBtn.Position = UDim2.new(1, -46, 0, 7); XBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30); XBtn.Text = "✕"; XBtn.TextColor3 = Color3.fromRGB(255, 215, 0); XBtn.TextSize = 16; XBtn.Font = Enum.Font.GothamBold; XBtn.ZIndex = 4; XBtn.Parent = TB
 Instance.new("UICorner", XBtn).CornerRadius = UDim.new(1, 0)
 XBtn.MouseButton1Click:Connect(function() MF.Visible = false end)
 
-local SF = Instance.new("ScrollingFrame")
-SF.Size = UDim2.new(1, -10, 1, -60); SF.Position = UDim2.new(0, 5, 0, 60); SF.BackgroundTransparency = 1; SF.ScrollBarThickness = 3; SF.ScrollBarImageColor3 = Color3.fromRGB(255, 215, 0); SF.CanvasSize = UDim2.new(0, 0, 0, 0); SF.AutomaticCanvasSize = Enum.AutomaticSize.Y; SF.Parent = MF
-local Layout = Instance.new("UIListLayout"); Layout.Padding = UDim.new(0, 6); Layout.SortOrder = Enum.SortOrder.LayoutOrder; Layout.Parent = SF
-local Pad = Instance.new("UIPadding"); PaddingTop = UDim.new(0, 8); Pad.PaddingBottom = UDim.new(0, 8); Pad.Parent = SF
+-- COLUMNS
+local LeftCol = Instance.new("ScrollingFrame")
+LeftCol.Size = UDim2.new(0.5, -15, 1, -60); LeftCol.Position = UDim2.new(0, 10, 0, 55); LeftCol.BackgroundTransparency = 1; LeftCol.ScrollBarThickness = 2; LeftCol.ScrollBarImageColor3 = Color3.fromRGB(255, 215, 0); LeftCol.CanvasSize = UDim2.new(0, 0, 0, 0); LeftCol.AutomaticCanvasSize = Enum.AutomaticSize.Y; LeftCol.ZIndex = 3; LeftCol.Parent = MF
+local LayoutL = Instance.new("UIListLayout"); LayoutL.Padding = UDim.new(0, 4); LayoutL.SortOrder = Enum.SortOrder.LayoutOrder; LayoutL.Parent = LeftCol
 
--- UI Helpers
-local function makeSection(text, order)
-    local lbl = Instance.new("TextLabel"); lbl.Size = UDim2.new(1, -10, 0, 24); lbl.BackgroundTransparency = 1; lbl.Text = "── " .. text .. " ──"; lbl.TextColor3 = Color3.fromRGB(255, 215, 0); lbl.Font = Enum.Font.GothamBold; lbl.TextSize = 13; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.LayoutOrder = order; lbl.Parent = SF
+local RightCol = Instance.new("ScrollingFrame")
+RightCol.Size = UDim2.new(0.5, -15, 1, -60); RightCol.Position = UDim2.new(0.5, 5, 0, 55); RightCol.BackgroundTransparency = 1; RightCol.ScrollBarThickness = 2; RightCol.ScrollBarImageColor3 = Color3.fromRGB(255, 215, 0); RightCol.CanvasSize = UDim2.new(0, 0, 0, 0); RightCol.AutomaticCanvasSize = Enum.AutomaticSize.Y; RightCol.ZIndex = 3; RightCol.Parent = MF
+local LayoutR = Instance.new("UIListLayout"); LayoutR.Padding = UDim.new(0, 4); LayoutR.SortOrder = Enum.SortOrder.LayoutOrder; LayoutR.Parent = RightCol
+
+-- UI HELPERS
+local function makeSection(text, order, parent)
+    local lbl = Instance.new("TextLabel"); lbl.Size = UDim2.new(1, -5, 0, 20); lbl.BackgroundTransparency = 1; lbl.Text = "── " .. text .. " ──"; lbl.TextColor3 = Color3.fromRGB(255, 215, 0); lbl.Font = Enum.Font.GothamBold; lbl.TextSize = 12; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.LayoutOrder = order; lbl.ZIndex = 4; lbl.Parent = parent
 end
-local function makeToggle(name, key, order)
-    local btn = Instance.new("TextButton"); btn.Size = UDim2.new(1, -10, 0, 32); btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30); btn.TextColor3 = Color3.fromRGB(255, 255, 255); btn.Font = Enum.Font.Gotham; btn.TextSize = 12; btn.TextXAlignment = Enum.TextXAlignment.Left; btn.LayoutOrder = order; btn.Parent = SF
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+local function makeToggle(name, key, order, parent)
+    local btn = Instance.new("TextButton"); btn.Size = UDim2.new(1, -5, 0, 26); btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30); btn.BackgroundTransparency = 0.3; btn.TextColor3 = Color3.fromRGB(255, 255, 255); btn.Font = Enum.Font.Gotham; btn.TextSize = 11; btn.TextXAlignment = Enum.TextXAlignment.Left; btn.LayoutOrder = order; btn.ZIndex = 4; btn.Parent = parent
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
     local function update() btn.Text = "  " .. (CFG[key] and "🟢 " or "🔴 ") .. name; btn.BackgroundColor3 = CFG[key] and Color3.fromRGB(35, 80, 40) or Color3.fromRGB(30, 30, 30) end
     update()
     btn.MouseButton1Click:Connect(function() CFG[key] = not CFG[key]; update() end)
 end
-local function makeSlider(name, key, min, max, order, callback)
-    local frame = Instance.new("Frame"); frame.Size = UDim2.new(1, -10, 0, 38); frame.BackgroundTransparency = 1; frame.LayoutOrder = order; frame.Parent = SF
-    local lbl = Instance.new("TextLabel"); lbl.Size = UDim2.new(1, 0, 0, 18); lbl.BackgroundTransparency = 1; lbl.Text = name .. ": " .. CFG[key]; lbl.TextColor3 = Color3.fromRGB(200, 200, 200); lbl.Font = Enum.Font.Gotham; lbl.TextSize = 11; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Parent = frame
-    local bar = Instance.new("TextButton"); bar.Size = UDim2.new(1, 0, 0, 10); bar.Position = UDim2.new(0, 0, 0, 22); bar.BackgroundColor3 = Color3.fromRGB(40, 40, 40); bar.Text = ""; bar.Parent = frame
+local function makeSlider(name, key, min, max, order, parent, callback)
+    local frame = Instance.new("Frame"); frame.Size = UDim2.new(1, -5, 0, 32); frame.BackgroundTransparency = 1; frame.LayoutOrder = order; frame.ZIndex = 4; frame.Parent = parent
+    local lbl = Instance.new("TextLabel"); lbl.Size = UDim2.new(1, 0, 0, 16); lbl.BackgroundTransparency = 1; lbl.Text = name .. ": " .. CFG[key]; lbl.TextColor3 = Color3.fromRGB(200, 200, 200); lbl.Font = Enum.Font.Gotham; lbl.TextSize = 10; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.ZIndex = 4; lbl.Parent = frame
+    local bar = Instance.new("TextButton"); bar.Size = UDim2.new(1, 0, 0, 8); bar.Position = UDim2.new(0, 0, 0, 20); bar.BackgroundColor3 = Color3.fromRGB(40, 40, 40); bar.Text = ""; bar.ZIndex = 4; bar.Parent = frame
     Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
-    local fill = Instance.new("Frame"); fill.Size = UDim2.new((CFG[key] - min) / (max - min), 0, 1, 0); fill.BackgroundColor3 = Color3.fromRGB(255, 215, 0); fill.Parent = bar
+    local fill = Instance.new("Frame"); fill.Size = UDim2.new((CFG[key] - min) / (max - min), 0, 1, 0); fill.BackgroundColor3 = Color3.fromRGB(255, 215, 0); fill.ZIndex = 4; fill.Parent = bar
     Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
     local dragging = false
     bar.MouseButton1Down:Connect(function() dragging = true end)
@@ -382,41 +393,51 @@ local function makeSlider(name, key, min, max, order, callback)
     bar.MouseMoved:Connect(function(x) processInput(x) end)
     UserInputService.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch then processInput(input.Position.X) end end)
 end
-local function makeButton(name, color, order, callback)
-    local btn = Instance.new("TextButton"); btn.Size = UDim2.new(1, -10, 0, 32); btn.BackgroundColor3 = color; btn.Text = name; btn.TextColor3 = Color3.fromRGB(255, 255, 255); btn.Font = Enum.Font.GothamBold; btn.TextSize = 12; btn.LayoutOrder = order; btn.Parent = SF
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+local function makeButton(name, color, order, parent, callback)
+    local btn = Instance.new("TextButton"); btn.Size = UDim2.new(1, -5, 0, 26); btn.BackgroundColor3 = color; btn.BackgroundTransparency = 0.3; btn.Text = name; btn.TextColor3 = Color3.fromRGB(255, 255, 255); btn.Font = Enum.Font.GothamBold; btn.TextSize = 11; btn.LayoutOrder = order; btn.ZIndex = 4; btn.Parent = parent
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
     btn.MouseButton1Click:Connect(callback)
 end
 
--- Build Menu
-makeSection("COMBAT", 1)
-makeToggle("Silent Aim", "SilentAim", 2)
-makeToggle("Aimbot", "Aimbot", 3)
-makeSlider("Aimbot Smooth", "AimbotSmoothing", 0, 100, 4)
-makeSlider("FOV Range", "FOVRange", 0, 360, 5)
-makeToggle("Skip Friends", "SkipFriends", 6)
+-- BUILD MENU
+makeSection("COMBAT", 1, LeftCol)
+makeToggle("Silent Aim", "SilentAim", 2, LeftCol)
+makeToggle("Aimbot", "Aimbot", 3, LeftCol)
+makeSlider("Aimbot Smooth", "AimbotSmoothing", 0, 100, 4, LeftCol)
+makeSlider("FOV Range", "FOVRange", 0, 360, 5, LeftCol)
+makeToggle("Skip Friends", "SkipFriends", 6, LeftCol)
 
-makeSection("WEAPONS", 10)
-makeToggle("Unlimited Ammo", "UnlimitedAmmo", 11)
-makeToggle("Force Reload (Crossbow)", "AutoReload", 12)
+makeSection("VISUAL & CAMERA", 10, LeftCol)
+makeToggle("ESP", "ESPEnabled", 11, LeftCol)
+makeToggle("Wide Screen", "WideScreen", 12, LeftCol, updateCameraFOV)
+makeSlider("Camera FOV", "CameraFOV", 40, 120, 13, LeftCol, updateCameraFOV)
 
-makeSection("MOVEMENT", 20)
-makeToggle("Infinite Jump (Fly)", "InfiniteJump", 21)
-makeToggle("Auto Sprint (Safe)", "AutoSprint", 22)
-makeSlider("Sprint Speed (Max 22)", "SprintSpeed", 16, 22, 23)
+makeSection("MOVEMENT", 20, LeftCol)
+makeToggle("Infinite Jump", "InfiniteJump", 21, LeftCol)
+makeToggle("Auto Sprint (Safe)", "AutoSprint", 22, LeftCol)
+makeSlider("Sprint Speed (Max 22)", "SprintSpeed", 16, 22, 23, LeftCol)
 
-makeSection("VISUAL & CAMERA", 30)
-makeToggle("ESP", "ESPEnabled", 31)
-makeToggle("Wide Screen (Ipad View)", "WideScreen", 32, updateCameraFOV)
-makeSlider("Camera FOV", "CameraFOV", 40, 120, 33, updateCameraFOV)
+makeSection("WEAPONS", 1, RightCol)
+makeToggle("Unlimited Ammo", "UnlimitedAmmo", 2, RightCol)
+makeToggle("Auto Reload", "AutoReload", 3, RightCol)
 
-makeSection("LOOT & RESPAWN", 40)
-makeToggle("Auto Pickup", "AutoPickup", 41)
-makeToggle("Auto Respawn", "AutoRespawn", 42)
-makeToggle("Respawn to Bag", "RespawnToBag", 43)
+makeSection("LOOT & PICKUP", 10, RightCol)
+makeToggle("Auto Pickup", "AutoPickup", 11, RightCol)
+local prioBtn = Instance.new("TextButton")
+prioBtn.Size = UDim2.new(1, -5, 0, 26); prioBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40); prioBtn.BackgroundTransparency = 0.3; prioBtn.Text = "Priority: " .. CFG.PickupPriority; prioBtn.TextColor3 = Color3.fromRGB(255, 255, 255); prioBtn.Font = Enum.Font.Gotham; prioBtn.TextSize = 11; prioBtn.LayoutOrder = 12; prioBtn.ZIndex = 4; prioBtn.Parent = RightCol
+Instance.new("UICorner", prioBtn).CornerRadius = UDim.new(0, 4)
+prioBtn.MouseButton1Click:Connect(function()
+    local list = {"Random", "Guns", "Heals"}
+    for i, v in ipairs(list) do if CFG.PickupPriority == v then CFG.PickupPriority = list[i % #list + 1]; break end end
+    prioBtn.Text = "Priority: " .. CFG.PickupPriority
+end)
 
-makeSection("SYSTEM", 50)
-makeButton("Server Hop", Color3.fromRGB(180, 80, 80), 51, function()
+makeSection("RESPAWN", 20, RightCol)
+makeToggle("Auto Respawn", "AutoRespawn", 21, RightCol)
+makeToggle("Respawn to Bag", "RespawnToBag", 22, RightCol)
+
+makeSection("SYSTEM", 30, RightCol)
+makeButton("Server Hop", Color3.fromRGB(180, 80, 80), 31, RightCol, function()
     pcall(function()
         local data = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"))
         if data and data.data then for _, s in ipairs(data.data) do if s.playing < s.maxPlayers and s.id ~= game.JobId then TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LP); return end end end
@@ -433,4 +454,4 @@ toggleBtn.InputBegan:Connect(function(input) if input.UserInputType == Enum.User
 UserInputService.InputChanged:Connect(function(input) if drag and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then local delta = input.Position - dragStart; toggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
 UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then drag = false; if startPos and math.abs(input.Position.X - dragStart.X) < 10 and math.abs(input.Position.Y - dragStart.Y) < 10 then MF.Visible = not MF.Visible end end end)
 
-print("✅ PRIMODAX v6.7 Loaded — Final Fix")
+print("✅ PRIMODAX v7.0 Loaded — Solo Leveling BG Applied")
