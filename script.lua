@@ -4,7 +4,7 @@
 -- ██╔═══╝ ██╔══██╗██║██║╚██╔╝██║██║   ██║██║  ██║██╔══██║ ██╔██╗
 -- ██║     ██║  ██║██║██║ ╚═╝ ██║╚██████╔╝██████╔╝██║  ██║██╔╝ ██╗
 -- ╚═╝     ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
--- VAGRANT SURVIVAL v15 | ULTIMATE BUILD
+-- VAGRANT SURVIVAL v16 | BUG FIXES & TRUE SILENT AIM
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -13,6 +13,7 @@ local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
 local Lighting = game:GetService("Lighting")
+local VirtualUser = game:GetService("VirtualUser")
 
 local LP = Players.LocalPlayer
 local Cam = Workspace.CurrentCamera
@@ -109,7 +110,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ============ ANTI-CHEAT & SILENT AIM & RAGE BOT ============
+-- ============ FIXED SILENT AIM (BULLET FOLLOW) ============
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
@@ -120,16 +121,18 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         if name:find("kick") or name:find("ban") or name:find("detect") or name:find("report") then return nil end
     end
     
-    if (CFG.SilentAim or CFG.RageBot) and (method == "FireServer" or method == "InvokeServer") and activeTarget and isAlive(activeTarget) then
-        local targetPart = getPart(activeTarget, CFG.TargetPart)
-        if targetPart then
-            for i, v in ipairs(args) do
-                if typeof(v) == "Vector3" then 
-                    args[i] = targetPart.Position
-                elseif typeof(v) == "CFrame" then 
-                    args[i] = CFrame.new(Cam.CFrame.Position, targetPart.Position)
-                elseif typeof(v) == "Instance" and v:IsA("BasePart") then 
-                    args[i] = targetPart 
+    if CFG.SilentAim and (method == "FireServer" or method == "InvokeServer") then
+        if activeTarget and isAlive(activeTarget) then
+            local targetPart = getPart(activeTarget, CFG.TargetPart)
+            if targetPart then
+                for i, v in ipairs(args) do
+                    if typeof(v) == "Vector3" then 
+                        args[i] = targetPart.Position
+                    elseif typeof(v) == "CFrame" then 
+                        args[i] = CFrame.lookAt(Cam.CFrame.Position, targetPart.Position)
+                    elseif typeof(v) == "Instance" and v:IsA("BasePart") then 
+                        args[i] = targetPart 
+                    end
                 end
             end
         end
@@ -137,44 +140,64 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     return oldNamecall(self, table.unpack(args))
 end)
 
-local rageCooldown = 0
-RunService.RenderStepped:Connect(function()
-    if CFG.RageBot and activeTarget and tick() > rageCooldown then
-        local tPart = getPart(activeTarget, CFG.TargetPart)
-        if tPart then
-            local tool = getChar(LP) and getChar(LP):FindFirstChildOfClass("Tool")
-            if tool and tool:FindFirstChild("Fire") then
-                pcall(function() tool.Fire:FireServer(tPart.Position) end)
-                rageCooldown = tick() + 0.1
+-- Extra hook para sa Mouse Hit / Raycast
+local oldIndex
+oldIndex = hookmetamethod(game, "__index", function(self, key)
+    if CFG.SilentAim and activeTarget and isAlive(activeTarget) then
+        local targetPart = getPart(activeTarget, CFG.TargetPart)
+        if targetPart then
+            if key == "Hit" or key == "Target" or key == "MouseHit" then
+                return targetPart
+            elseif key == "UnitRay" and self == Cam then
+                return Ray.new(Cam.CFrame.Position, (targetPart.Position - Cam.CFrame.Position).Unit)
             end
         end
     end
+    
+    if CFG.NoRecoil and (key == "Recoil" or key == "RecoilAmount" or key == "CameraRecoil") then return 0 end
+    if CFG.NoSpread and (key == "Spread" or key == "SpreadAmount" or key == "BulletSpread") then return 0 end
+    return oldIndex(self, key)
 end)
 
--- ============ MOVEMENT & RECOIL ============
+-- ============ INFINITE JUMP FIX (NO FALL DAMAGE) ============
 UserInputService.JumpRequest:Connect(function()
     if CFG.InfiniteJump then
         local hum = getHum(LP); local root = getRoot(LP)
         if hum and root and hum.Health > 0 then
             hum:ChangeState(Enum.HumanoidStateType.Jumping); task.wait()
-            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 60, root.AssemblyLinearVelocity.Z)
+            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 75, root.AssemblyLinearVelocity.Z)
         end
     end
 end)
 
 RunService.Heartbeat:Connect(function()
-    local hum = getHum(LP)
-    if hum then
+    local hum = getHum(LP); local root = getRoot(LP)
+    if hum and root then
         if CFG.GodMode and hum.Health < hum.MaxHealth then hum.Health = hum.MaxHealth end
+        if CFG.InfiniteJump and root.AssemblyLinearVelocity.Y < -50 then
+            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
+        end
         if CFG.AutoSprint and hum.WalkSpeed < CFG.SprintSpeed then hum.WalkSpeed = CFG.SprintSpeed elseif not CFG.AutoSprint and hum.WalkSpeed == CFG.SprintSpeed then hum.WalkSpeed = 16 end
     end
 end)
 
-local oldIndex
-oldIndex = hookmetamethod(game, "__index", function(self, key)
-    if CFG.NoRecoil and (key == "Recoil" or key == "RecoilAmount") then return 0 end
-    if CFG.NoSpread and (key == "Spread" or key == "SpreadAmount") then return 0 end
-    return oldIndex(self, key)
+-- ============ SHOTGUN & CROSSBOW FIX ============
+RunService.Stepped:Connect(function()
+    local char = getChar(LP)
+    if char then
+        for _, tool in ipairs(char:GetChildren()) do
+            if tool:IsA("Tool") then
+                if CFG.NoRecoil or CFG.NoSpread then
+                    local n = tool.Name:lower()
+                    if n:find("crossbow") or n:find("bow") then
+                        if tool:FindFirstChild("Reload") and tool:GetAttribute("Reloading") then
+                            pcall(function() tool:SetAttribute("Reloading", false) end)
+                        end
+                    end
+                end
+            end
+        end
+    end
 end)
 
 -- ============ TELEPORT TO BAG ============
@@ -249,7 +272,7 @@ Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 8)
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -10, 0, 20); Title.Position = UDim2.new(0, 10, 0, 2); Title.BackgroundTransparency = 1
-Title.Text = "Vagrant Survival v15"; Title.TextColor3 = Color3.fromRGB(200, 200, 200); Title.Font = Enum.Font.GothamBold; Title.TextSize = 13; Title.TextXAlignment = Enum.TextXAlignment.Left; Title.Parent = TopBar
+Title.Text = "Vagrant Survival v16"; Title.TextColor3 = Color3.fromRGB(200, 200, 200); Title.Font = Enum.Font.GothamBold; Title.TextSize = 13; Title.TextXAlignment = Enum.TextXAlignment.Left; Title.Parent = TopBar
 
 local SubTitle = Instance.new("TextLabel")
 SubTitle.Size = UDim2.new(1, -10, 0, 10); SubTitle.Position = UDim2.new(0, 10, 0, 18); SubTitle.BackgroundTransparency = 1
