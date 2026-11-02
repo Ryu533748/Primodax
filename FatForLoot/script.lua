@@ -1,10 +1,4 @@
--- ██████╗  █████╗ ████████╗    ███████╗ ██████╗ ██████╗     ██╗      ██████╗  ██████╗ ████████╗
--- ██╔══██╗██╔══██╗╚══██╔══╝    ██╔════╝██╔═══██╗██╔══██╗    ██║     ██╔═══██╗██╔═══██╗╚══██╔══╝
--- ██████╔╝███████║   ██║       █████╗  ██║   ██║██████╔╝    ██║     ██║   ██║██║   ██║   ██║   
--- ██╔══██╗██╔══██║   ██║       ██╔══╝  ██║   ██║██╔══██╗    ██║     ██║   ██║██║   ██║   ██║   
--- ██║  ██║██║  ██║   ██║       ██║     ╚██████╔╝██║  ██║    ███████╗╚██████╔╝╚██████╔╝   ██║   
--- ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝       ╚═╝      ╚═════╝ ╚═╝  ╚═╝    ╚══════╝ ╚═════╝  ╚═════╝    ╚═╝   
--- AUTO CLICKER & LOOT FARMER
+-- +1 FAT FOR LOOT | CREATED BY: BOBOYTAGAAQUARIUS
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -51,15 +45,12 @@ RunService.Heartbeat:Connect(function()
         local part = obj:IsA("BasePart") and obj or obj:FindFirstChildOfClass("BasePart")
         if part and (root.Position - part.Position).Magnitude < CFG.FarmRadius then
             local name = obj.Name:lower()
-            -- Kung loot, pera, o item
             if name:find("loot") or name:find("coin") or name:find("food") or name:find("item") then
                 pcall(function()
-                    -- Kung may ProximityPrompt, pindutin
                     for _, v in ipairs(obj:GetDescendants()) do
                         if v:IsA("ProximityPrompt") then fireproximityprompt(v) end
                         if v:IsA("ClickDetector") then fireclickdetector(v) end
                     end
-                    -- Kung kailangan ng touch (parang sa ibang laro), gawing position ng player
                     if part.CanCollide then
                         root.CFrame = part.CFrame
                     end
@@ -133,26 +124,52 @@ local parentGui = gethui and gethui() or CoreGui
 if parentGui:FindFirstChild("FatForLootUI") then parentGui:FindFirstChild("FatForLootUI"):Destroy() end
 
 local SG = Instance.new("ScreenGui")
-SG.Name = "FatForLootUI"; SG.ResetOnSpawn = false; SG.IgnoreGuiInset = true; SG.Parent = parentGui
+SG.Name = "FatForLootUI"; SG.ResetOnSpawn = false; SG.IgnoreGuiInset = true; SG.DisplayOrder = 999; SG.Parent = parentGui
 if protect_gui then pcall(protect_gui, SG) end
 
 local FloatBtn = Instance.new("TextButton")
 FloatBtn.Size = UDim2.new(0, 40, 0, 40); FloatBtn.Position = UDim2.new(0, 20, 0, 20)
 FloatBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20); FloatBtn.Text = "⚙️"; FloatBtn.TextSize = 20; FloatBtn.TextColor3 = Color3.fromRGB(100, 200, 50); FloatBtn.Parent = SG
 Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(1, 0)
+local stroke = Instance.new("UIStroke", FloatBtn); stroke.Color = Color3.fromRGB(100, 200, 50); stroke.Thickness = 2
 
 local MF = Instance.new("Frame")
 MF.Size = UDim2.new(0, 350, 0, 240); MF.Position = UDim2.new(0.5, -175, 0.5, -120)
 MF.BackgroundColor3 = Color3.fromRGB(12, 12, 12); MF.BorderSizePixel = 0; MF.Active = true; MF.Visible = false; MF.Parent = SG
 Instance.new("UICorner", MF).CornerRadius = UDim.new(0, 8)
 
+local draggingBtn, dragStartBtn, startPosBtn
+FloatBtn.InputBegan:Connect(function(input) 
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+        draggingBtn = true; dragStartBtn = input.Position; startPosBtn = FloatBtn.Position 
+    end 
+end)
+UserInputService.InputChanged:Connect(function(input) 
+    if draggingBtn and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then 
+        local delta = input.Position - dragStartBtn; FloatBtn.Position = UDim2.new(startPosBtn.X.Scale, startPosBtn.X.Offset + delta.X, startPosBtn.Y.Scale, startPosBtn.Y.Offset + delta.Y) 
+    end 
+end)
+UserInputService.InputEnded:Connect(function(input) 
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+        if draggingBtn then
+            local delta = input.Position - dragStartBtn
+            if math.abs(delta.X) < 5 and math.abs(delta.Y) < 5 then MF.Visible = not MF.Visible end
+        end
+        draggingBtn = false 
+    end 
+end)
+
 local TopBar = Instance.new("Frame")
-TopBar.Size = UDim2.new(1, 0, 0, 30); TopBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20); TopBar.Parent = MF
+TopBar.Size = UDim2.new(1, 0, 0, 35); TopBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20); TopBar.Parent = MF
 Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 8)
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -10, 1, 0); Title.Position = UDim2.new(0, 10, 0, 0); Title.BackgroundTransparency = 1
-Title.Text = "Fat For Loot v1.0"; Title.TextColor3 = Color3.fromRGB(200, 200, 200); Title.Font = Enum.Font.GothamBold; Title.TextSize = 13; Title.TextXAlignment = Enum.TextXAlignment.Left; Title.Parent = TopBar
+Title.Size = UDim2.new(1, -10, 0, 20); Title.Position = UDim2.new(0, 10, 0, 2); Title.BackgroundTransparency = 1
+Title.Text = "+1 Fat For Loot"; Title.TextColor3 = Color3.fromRGB(200, 200, 200); Title.Font = Enum.Font.GothamBold; Title.TextSize = 13; Title.TextXAlignment = Enum.TextXAlignment.Left; Title.Parent = TopBar
+
+local SubTitle = Instance.new("TextLabel")
+SubTitle.Size = UDim2.new(1, -10, 0, 10); SubTitle.Position = UDim2.new(0, 10, 0, 18); SubTitle.BackgroundTransparency = 1
+SubTitle.Text = "Created by: BoboyTagaAquarius"; SubTitle.TextColor3 = Color3.fromRGB(150, 150, 150); SubTitle.Font = Enum.Font.Gotham; SubTitle.TextSize = 10; SubTitle.TextXAlignment = Enum.TextXAlignment.Left; SubTitle.Parent = TopBar
 
 local Content = Instance.new("Frame")
 Content.Size = UDim2.new(1, -20, 1, -40); Content.Position = UDim2.new(0, 10, 0, 35); Content.BackgroundTransparency = 1; Content.Parent = MF
@@ -189,6 +206,3 @@ end)
 UserInputService.InputEnded:Connect(function(input) 
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end 
 end)
-
-local isOpen = false
-FloatBtn.MouseButton1Click:Connect(function() isOpen = not isOpen; MF.Visible = isOpen end)
