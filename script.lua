@@ -4,7 +4,7 @@
 -- ██╔═══╝ ██╔══██╗██║██║╚██╔╝██║██║   ██║██║  ██║██╔══██║ ██╔██╗
 -- ██║     ██║  ██║██║██║ ╚═╝ ██║╚██████╔╝██████╔╝██║  ██║██╔╝ ██╗
 -- ╚═╝     ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
--- VAGRANT SURVIVAL v16 | BUG FIXES & TRUE SILENT AIM
+-- VAGRANT SURVIVAL v18 | GUN ESP & WALL PENETRATION
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -20,10 +20,10 @@ local Cam = Workspace.CurrentCamera
 
 -- ============ CONFIG & DEFAULT ============
 local CFG = {
-    ESPEnabled = false, ESPBox = false, ESPName = false, ESPDistance = false, ESPSkeleton = false, 
-    ESPLine = false, GunESPEnabled = false, NightVision = false,
+    ESPEnabled = true, ESPBox = true, ESPName = true, ESPDistance = true, ESPSkeleton = true, 
+    ESPLine = false, GunESPEnabled = true, NightVision = false,
     SilentAim = true, RageBot = false, Aimbot = false, AimbotSmoothing = 15, FOVRange = 250,
-    WallCheck = false, TargetPart = "Head", UseFOV = true, SkipFriends = true,
+    WallCheck = true, TargetPart = "Head", UseFOV = true, SkipFriends = true,
     NoRecoil = true, NoSpread = true,
     InfiniteJump = false, AutoSprint = false, SprintSpeed = 22, GodMode = false,
     AutoPickup = false, PickupPriority = "Random", 
@@ -39,13 +39,6 @@ local function isAlive(p) local h = getHum(p) return h and h.Health > 0 end
 
 local function isVisible(targetPart, camPos)
     if not CFG.WallCheck then return true end
-    local rayParams = RaycastParams.new()
-    rayParams.FilterType = Enum.RaycastFilterType.Exclude
-    rayParams.FilterDescendantsInstances = {LP.Character, Cam}
-    local result = Workspace:Raycast(camPos, targetPart.Position - camPos, rayParams)
-    if result and result.Instance then
-        return result.Instance:IsDescendantOf(targetPart.Parent)
-    end
     return true
 end
 
@@ -66,6 +59,136 @@ local function toggleNightVision()
         nightVisionBright.Parent = nil
     end
 end
+
+-- ============ ESP SYSTEM ============
+local espObjects = {}
+local function createESP(player)
+    if espObjects[player] or player == LP then return end
+    local objs = {
+        Box = Drawing.new("Square"), Name = Drawing.new("Text"), Dist = Drawing.new("Text"), Line = Drawing.new("Line"),
+        Skel = { Head = Drawing.new("Line"), Torso = Drawing.new("Line"), LArm = Drawing.new("Line"), RArm = Drawing.new("Line"), LLeg = Drawing.new("Line"), RLeg = Drawing.new("Line") }
+    }
+    objs.Box.Thickness = 1; objs.Box.Color = Color3.fromRGB(255, 50, 50); objs.Box.Filled = false
+    objs.Name.Size = 14; objs.Name.Center = true; objs.Name.Outline = true; objs.Name.Color = Color3.fromRGB(255, 255, 255)
+    objs.Dist.Size = 12; objs.Dist.Center = true; objs.Dist.Outline = true; objs.Dist.Color = Color3.fromRGB(255, 215, 0)
+    objs.Line.Thickness = 1; objs.Line.Color = Color3.fromRGB(255, 255, 255)
+    for k, v in pairs(objs.Skel) do v.Thickness = 1; v.Color = Color3.fromRGB(255, 255, 255) end
+    espObjects[player] = objs
+end
+
+for _, p in ipairs(Players:GetPlayers()) do createESP(p) end
+Players.PlayerAdded:Connect(createESP)
+Players.PlayerRemoving:Connect(function(p)
+    if espObjects[p] then
+        for _, v in pairs(espObjects[p]) do
+            if typeof(v) == "table" then for _, l in pairs(v) do pcall(function() l:Remove() end) end
+            else pcall(function() v:Remove() end) end
+        end
+        espObjects[p] = nil
+    end
+end)
+
+task.spawn(function()
+    while task.wait() do
+        for player, objs in pairs(espObjects) do
+            local isRendered = false
+            if CFG.ESPEnabled and isAlive(player) then
+                local char = getChar(player); local root = getRoot(player); local head = getPart(player, "Head"); local myRoot = getRoot(LP)
+                if root and head and myRoot then
+                    local headPos, onScreen = Cam:WorldToViewportPoint(head.Position)
+                    local rootPos, _ = Cam:WorldToViewportPoint(root.Position)
+                    if onScreen then
+                        isRendered = true
+                        local height = math.abs(rootPos.Y - headPos.Y) * 1.8; local width = height * 0.6
+                        objs.Box.Visible = CFG.ESPBox; objs.Box.Size = Vector2.new(width, height); objs.Box.Position = Vector2.new(headPos.X - width/2, headPos.Y - height*0.2)
+                        objs.Name.Visible = CFG.ESPName; objs.Name.Text = player.Name; objs.Name.Position = Vector2.new(headPos.X, headPos.Y - 20)
+                        objs.Dist.Visible = CFG.ESPDistance; objs.Dist.Text = string.format("[%d studs]", (myRoot.Position - root.Position).Magnitude); objs.Dist.Position = Vector2.new(headPos.X, rootPos.Y + 10)
+                        objs.Line.Visible = CFG.ESPLine; objs.Line.From = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y); objs.Line.To = Vector2.new(headPos.X, headPos.Y)
+                        
+                        if CFG.ESPSkeleton then
+                            local function drawBone(p1, p2, line)
+                                if p1 and p2 then
+                                    local v1, on1 = Cam:WorldToViewportPoint(p1.Position); local v2, on2 = Cam:WorldToViewportPoint(p2.Position)
+                                    line.Visible = on1 and on2; line.From = Vector2.new(v1.X, v1.Y); line.To = Vector2.new(v2.X, v2.Y)
+                                else line.Visible = false end
+                            end
+                            drawBone(head, char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"), objs.Skel.Head)
+                            drawBone(char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"), char:FindFirstChild("LowerTorso") or char:FindFirstChild("Torso"), objs.Skel.Torso)
+                            drawBone(char:FindFirstChild("LeftUpperArm"), char:FindFirstChild("LeftLowerArm"), objs.Skel.LArm)
+                            drawBone(char:FindFirstChild("RightUpperArm"), char:FindFirstChild("RightLowerArm"), objs.Skel.RArm)
+                            drawBone(char:FindFirstChild("LeftUpperLeg"), char:FindFirstChild("LeftLowerLeg"), objs.Skel.LLeg)
+                            drawBone(char:FindFirstChild("RightUpperLeg"), char:FindFirstChild("RightLowerLeg"), objs.Skel.RLeg)
+                        else
+                            for _, l in pairs(objs.Skel) do l.Visible = false end
+                        end
+                    end
+                end
+            end
+            if not isRendered then
+                objs.Box.Visible = false; objs.Name.Visible = false; objs.Dist.Visible = false; objs.Line.Visible = false
+                for _, l in pairs(objs.Skel) do l.Visible = false end
+            end
+        end
+    end
+end)
+
+-- ============ GUN ESP SYSTEM (FIXED) ============
+local gunESPObjects = {}
+task.spawn(function()
+    while task.wait(0.5) do
+        if not CFG.GunESPEnabled then
+            for obj, drawing in pairs(gunESPObjects) do
+                drawing.Text:Remove(); drawing.Dist:Remove(); gunESPObjects[obj] = nil
+            end
+        else
+            for obj, drawing in pairs(gunESPObjects) do
+                if not obj or not obj.Parent then
+                    drawing.Text:Remove(); drawing.Dist:Remove(); gunESPObjects[obj] = nil
+                end
+            end
+            for _, obj in ipairs(Workspace:GetDescendants()) do
+                if obj:IsA("Model") or obj:IsA("Tool") or obj:IsA("BasePart") then
+                    local name = obj.Name:lower()
+                    if name:find("gun") or name:find("crossbow") or name:find("weapon") or name:find("rifle") or name:find("pistol") or name:find("shotgun") or name:find("revolver") then
+                        local part = obj:IsA("BasePart") and obj or obj:FindFirstChildOfClass("BasePart")
+                        if part then
+                            if not gunESPObjects[obj] then
+                                local text = Drawing.new("Text"); text.Size = 14; text.Center = true; text.Outline = true; text.Color = Color3.fromRGB(0, 255, 255)
+                                local dist = Drawing.new("Text"); dist.Size = 12; dist.Center = true; dist.Outline = true; dist.Color = Color3.fromRGB(255, 255, 255)
+                                gunESPObjects[obj] = {Text = text, Dist = dist}
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if CFG.GunESPEnabled then
+        for obj, drawing in pairs(gunESPObjects) do
+            if obj and obj.Parent then
+                local part = obj:IsA("BasePart") and obj or obj:FindFirstChildOfClass("BasePart")
+                if part then
+                    local screenPos, onScreen = Cam:WorldToViewportPoint(part.Position)
+                    if onScreen then
+                        local myRoot = getRoot(LP)
+                        local distance = myRoot and math.floor((myRoot.Position - part.Position).Magnitude) or 0
+                        drawing.Text.Text = "[" .. obj.Name .. "]"
+                        drawing.Text.Position = Vector2.new(screenPos.X, screenPos.Y - 20)
+                        drawing.Text.Visible = true
+                        drawing.Dist.Text = "[" .. tostring(distance) .. " studs]"
+                        drawing.Dist.Position = Vector2.new(screenPos.X, screenPos.Y)
+                        drawing.Dist.Visible = true
+                    else
+                        drawing.Text.Visible = false; drawing.Dist.Visible = false
+                    end
+                end
+            end
+        end
+    end
+end)
 
 -- ============ TARGETING & AIMBOT ============
 local activeTarget = nil
@@ -121,18 +244,16 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         if name:find("kick") or name:find("ban") or name:find("detect") or name:find("report") then return nil end
     end
     
-    if CFG.SilentAim and (method == "FireServer" or method == "InvokeServer") then
-        if activeTarget and isAlive(activeTarget) then
-            local targetPart = getPart(activeTarget, CFG.TargetPart)
-            if targetPart then
-                for i, v in ipairs(args) do
-                    if typeof(v) == "Vector3" then 
-                        args[i] = targetPart.Position
-                    elseif typeof(v) == "CFrame" then 
-                        args[i] = CFrame.lookAt(Cam.CFrame.Position, targetPart.Position)
-                    elseif typeof(v) == "Instance" and v:IsA("BasePart") then 
-                        args[i] = targetPart 
-                    end
+    if CFG.SilentAim and (method == "FireServer" or method == "InvokeServer") and activeTarget and isAlive(activeTarget) then
+        local targetPart = getPart(activeTarget, CFG.TargetPart)
+        if targetPart then
+            for i, v in ipairs(args) do
+                if typeof(v) == "Vector3" then 
+                    args[i] = targetPart.Position
+                elseif typeof(v) == "CFrame" then 
+                    args[i] = CFrame.lookAt(Cam.CFrame.Position, targetPart.Position)
+                elseif typeof(v) == "Instance" and v:IsA("BasePart") then 
+                    args[i] = targetPart 
                 end
             end
         end
@@ -140,7 +261,6 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     return oldNamecall(self, table.unpack(args))
 end)
 
--- Extra hook para sa Mouse Hit / Raycast
 local oldIndex
 oldIndex = hookmetamethod(game, "__index", function(self, key)
     if CFG.SilentAim and activeTarget and isAlive(activeTarget) then
@@ -272,7 +392,7 @@ Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 8)
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -10, 0, 20); Title.Position = UDim2.new(0, 10, 0, 2); Title.BackgroundTransparency = 1
-Title.Text = "Vagrant Survival v16"; Title.TextColor3 = Color3.fromRGB(200, 200, 200); Title.Font = Enum.Font.GothamBold; Title.TextSize = 13; Title.TextXAlignment = Enum.TextXAlignment.Left; Title.Parent = TopBar
+Title.Text = "Vagrant Survival v18"; Title.TextColor3 = Color3.fromRGB(200, 200, 200); Title.Font = Enum.Font.GothamBold; Title.TextSize = 13; Title.TextXAlignment = Enum.TextXAlignment.Left; Title.Parent = TopBar
 
 local SubTitle = Instance.new("TextLabel")
 SubTitle.Size = UDim2.new(1, -10, 0, 10); SubTitle.Position = UDim2.new(0, 10, 0, 18); SubTitle.BackgroundTransparency = 1
@@ -373,7 +493,7 @@ makeToggle("Rage Bot (Auto Fire)", "RageBot", CombatPage, 2)
 makeToggle("Aimbot (Smooth)", "Aimbot", CombatPage, 3)
 makeSlider("Aimbot Smooth", "AimbotSmoothing", 0, 100, CombatPage, 4)
 makeToggle("Skip Friends", "SkipFriends", CombatPage, 5)
-makeToggle("Wall Check", "WallCheck", CombatPage, 6)
+makeToggle("Wall Check (Wallbang)", "WallCheck", CombatPage, 6)
 makeDropdown("Target Part", "TargetPart", {"Head", "HumanoidRootPart", "Torso"}, CombatPage, 7)
 makeToggle("Use FOV", "UseFOV", CombatPage, 8)
 makeSlider("FOV Radius", "FOVRange", 0, 800, CombatPage, 9)
