@@ -13,29 +13,51 @@ local Cam = Workspace.CurrentCamera
 local CFG = {
     AutoClick = false, ClickDelay = 0.1,
     AutoFarm = false, FarmRadius = 30,
-    AutoCollect = false,
+    AutoCollect = false, TargetRarity = "All",
     PlayerESP = false, ItemESP = false
 }
 
 -- ============ UTILS ============
 local function getChar() return LP.Character end
 local function getRoot() local c = getChar() return c and c:FindFirstChild("HumanoidRootPart") end
+local function isAlive(p) local h = p and p.Character and p.Character:FindFirstChildOfClass("Humanoid"); return h and h.Health > 0 end
+
+-- Function para i-check kung match sa rarity
+local function isTargetLoot(obj)
+    local name = obj.Name:lower()
+    
+    -- Base check kung loot/ore ba talaga
+    local isLoot = name:find("loot") or name:find("coin") or name:find("food") or name:find("item") or name:find("ore") or name:find("drop")
+    if not isLoot then return false end
+
+    -- Rarity logic
+    if CFG.TargetRarity == "All" then return true end
+    
+    local r = CFG.TargetRarity:lower()
+    if name:find(r) then return true end
+    
+    -- Kung walang nakasulat sa pangalan, check natin attributes
+    local attr = obj:GetAttribute("Rarity") or obj:GetAttribute("Type") or obj:GetAttribute("Tier")
+    if attr and tostring(attr):lower() == r then return true end
+    
+    return false
+end
 
 -- ============ CORE FEATURES ============
 
--- 1. Auto Clicker (Clicks your screen/mouse automatically)
+-- 1. Auto Clicker
 task.spawn(function()
     while task.wait(CFG.ClickDelay) do
         if CFG.AutoClick then
             pcall(function()
                 VirtualUser:CaptureController()
-                VirtualUser:ClickButton1(Vector2.new(0,0), Cam.CFrame)
+                VirtualUser:ClickButton1(Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2), Cam.CFrame)
             end)
         end
     end
 end)
 
--- 2. Auto Collect Loot (Pulls nearby models/parts)
+-- 2. Auto Collect Loot
 RunService.Heartbeat:Connect(function()
     if not CFG.AutoCollect then return end
     local root = getRoot()
@@ -44,15 +66,11 @@ RunService.Heartbeat:Connect(function()
     for _, obj in ipairs(Workspace:GetChildren()) do
         local part = obj:IsA("BasePart") and obj or obj:FindFirstChildOfClass("BasePart")
         if part and (root.Position - part.Position).Magnitude < CFG.FarmRadius then
-            local name = obj.Name:lower()
-            if name:find("loot") or name:find("coin") or name:find("food") or name:find("item") then
+            if isTargetLoot(obj) then
                 pcall(function()
                     for _, v in ipairs(obj:GetDescendants()) do
                         if v:IsA("ProximityPrompt") then fireproximityprompt(v) end
                         if v:IsA("ClickDetector") then fireclickdetector(v) end
-                    end
-                    if part.CanCollide then
-                        root.CFrame = part.CFrame
                     end
                 end)
             end
@@ -60,18 +78,23 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- 3. Auto Farm (Teleports to loots)
+-- 3. Auto Farm (Teleports to loots based on Rarity)
 task.spawn(function()
     while task.wait(0.5) do
         if CFG.AutoFarm then
             local root = getRoot()
-            if not root then continue end
+            if not root then return end
             
             local bestTarget, bDist = nil, CFG.FarmRadius
             for _, obj in ipairs(Workspace:GetDescendants()) do
-                if obj:IsA("BasePart") and obj.Name:lower():find("loot") then
-                    local dist = (root.Position - obj.Position).Magnitude
-                    if dist < bDist then bestTarget = obj; bDist = dist end
+                if obj:IsA("BasePart") or obj:IsA("Model") then
+                    if isTargetLoot(obj) then
+                        local part = obj:IsA("BasePart") and obj or obj:FindFirstChildOfClass("BasePart")
+                        if part then
+                            local dist = (root.Position - part.Position).Magnitude
+                            if dist < bDist then bestTarget = part; bDist = dist end
+                        end
+                    end
                 end
             end
             
@@ -82,7 +105,7 @@ task.spawn(function()
     end
 end)
 
--- 4. Player & Item ESP (Para makita mo kung nasaan ang pagkain)
+-- 4. Player ESP
 local espObjects = {}
 local function createESP(player)
     if espObjects[player] or player == LP then return end
@@ -93,28 +116,36 @@ end
 
 for _, p in ipairs(Players:GetPlayers()) do createESP(p) end
 Players.PlayerAdded:Connect(createESP)
+Players.PlayerRemoving:Connect(function(p)
+    if espObjects[p] then
+        espObjects[p].Box:Remove(); espObjects[p].Name:Remove(); espObjects[p] = nil
+    end
+end)
 
 RunService.RenderStepped:Connect(function()
     if not CFG.PlayerESP then
         for _, esp in pairs(espObjects) do esp.Box.Visible = false; esp.Name.Visible = false end
         return
     end
-
     for player, esp in pairs(espObjects) do
-        local char = player.Character
-        local head = char and char:FindFirstChild("Head")
-        if head then
-            local pos, onS = Cam:WorldToViewportPoint(head.Position)
-            if onS then
-                esp.Box.Visible = true
-                esp.Box.Size = Vector2.new(40, 50)
-                esp.Box.Position = Vector2.new(pos.X - 20, pos.Y - 25)
-                esp.Name.Visible = true
-                esp.Name.Text = player.Name
-                esp.Name.Position = Vector2.new(pos.X, pos.Y - 40)
-            else
-                esp.Box.Visible = false; esp.Name.Visible = false
+        if isAlive(player) then
+            local char = player.Character
+            local head = char and char:FindFirstChild("Head")
+            if head then
+                local pos, onS = Cam:WorldToViewportPoint(head.Position)
+                if onS then
+                    esp.Box.Visible = true
+                    esp.Box.Size = Vector2.new(40, 50)
+                    esp.Box.Position = Vector2.new(pos.X - 20, pos.Y - 25)
+                    esp.Name.Visible = true
+                    esp.Name.Text = player.Name
+                    esp.Name.Position = Vector2.new(pos.X, pos.Y - 40)
+                else
+                    esp.Box.Visible = false; esp.Name.Visible = false
+                end
             end
+        else
+            esp.Box.Visible = false; esp.Name.Visible = false
         end
     end
 end)
@@ -134,7 +165,7 @@ Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(1, 0)
 local stroke = Instance.new("UIStroke", FloatBtn); stroke.Color = Color3.fromRGB(100, 200, 50); stroke.Thickness = 2
 
 local MF = Instance.new("Frame")
-MF.Size = UDim2.new(0, 350, 0, 240); MF.Position = UDim2.new(0.5, -175, 0.5, -120)
+MF.Size = UDim2.new(0, 350, 0, 280); MF.Position = UDim2.new(0.5, -175, 0.5, -140)
 MF.BackgroundColor3 = Color3.fromRGB(12, 12, 12); MF.BorderSizePixel = 0; MF.Active = true; MF.Visible = false; MF.Parent = SG
 Instance.new("UICorner", MF).CornerRadius = UDim.new(0, 8)
 
@@ -165,7 +196,7 @@ Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 8)
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -10, 0, 20); Title.Position = UDim2.new(0, 10, 0, 2); Title.BackgroundTransparency = 1
-Title.Text = "+1 Fat For Loot"; Title.TextColor3 = Color3.fromRGB(200, 200, 200); Title.Font = Enum.Font.GothamBold; Title.TextSize = 13; Title.TextXAlignment = Enum.TextXAlignment.Left; Title.Parent = TopBar
+Title.Text = "+1 Fat For Loot v2.1"; Title.TextColor3 = Color3.fromRGB(200, 200, 200); Title.Font = Enum.Font.GothamBold; Title.TextSize = 13; Title.TextXAlignment = Enum.TextXAlignment.Left; Title.Parent = TopBar
 
 local SubTitle = Instance.new("TextLabel")
 SubTitle.Size = UDim2.new(1, -10, 0, 10); SubTitle.Position = UDim2.new(0, 10, 0, 18); SubTitle.BackgroundTransparency = 1
@@ -189,9 +220,22 @@ local function makeToggle(name, key, callback)
     end)
 end
 
-makeToggle("Auto Click", "AutoClick")
-makeToggle("Auto Farm (Loot)", "AutoFarm")
+local function makeDropdown(name, key, options)
+    local btn = Instance.new("TextButton"); btn.Size = UDim2.new(1, 0, 0, 30); btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30); btn.Text = ""; btn.Parent = Content
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    local lbl = Instance.new("TextLabel"); lbl.Size = UDim2.new(1, -10, 1, 0); lbl.Position = UDim2.new(0, 10, 0, 0); lbl.BackgroundTransparency = 1; lbl.Text = name .. ": " .. CFG[key]; lbl.TextColor3 = Color3.fromRGB(200, 200, 200); lbl.Font = Enum.Font.Gotham; lbl.TextSize = 12; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Parent = btn
+    btn.MouseButton1Click:Connect(function()
+        local curIdx = 1
+        for i, v in ipairs(options) do if v == CFG[key] then curIdx = i; break end end
+        CFG[key] = options[(curIdx % #options) + 1]
+        lbl.Text = name .. ": " .. CFG[key]
+    end)
+end
+
+makeToggle("Auto Click (PC/Mobile)", "AutoClick")
+makeToggle("Auto Farm (Target Rarity)", "AutoFarm")
 makeToggle("Auto Collect (Radius)", "AutoCollect")
+makeDropdown("Rarity Filter", "TargetRarity", {"All", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"})
 makeToggle("Player ESP", "PlayerESP")
 
 local dragging, dragStart, startPos
