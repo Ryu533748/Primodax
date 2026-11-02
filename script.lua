@@ -4,7 +4,7 @@
 -- ██╔═══╝ ██╔══██╗██║██║╚██╔╝██║██║   ██║██║  ██║██╔══██║ ██╔██╗
 -- ██║     ██║  ██║██║██║ ╚═╝ ██║╚██████╔╝██████╔╝██║  ██║██╔╝ ██╗
 -- ╚═╝     ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
--- PRIMODAX VGRANT v7.1 | GODMODE | FLY JUMP | BG FIXED
+-- PRIMODAX VGRANT v7.2 | UI FIXED | GODMODE | FLY JUMP
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -40,13 +40,8 @@ RunService.Heartbeat:Connect(function()
     if not CFG.GodMode then return end
     local hum = getHum(LP)
     if hum then
-        if hum.Health < hum.MaxHealth then
-            hum.Health = hum.MaxHealth
-        end
-        -- Pwersahang i-lock ang health
-        if hum.Health <= 0 then
-            hum.Health = 100
-        end
+        if hum.Health < hum.MaxHealth then hum.Health = hum.MaxHealth end
+        if hum.Health <= 0 then hum.Health = 100 end
     end
 end)
 
@@ -193,7 +188,6 @@ RunService.Heartbeat:Connect(function()
             end
         end
     end
-    -- Force Reload pagnauubos
     if CFG.AutoReload and tool:GetAttribute("Reloading") then
         task.spawn(function() tool:Activate() end)
     end
@@ -213,7 +207,6 @@ RunService.Heartbeat:Connect(function()
         hum.WalkSpeed = 16
     end
 
-    -- Infinite Jump (Fly Jump)
     if CFG.InfiniteJump then
         local isJumping = UserInputService:IsKeyDown(Enum.KeyCode.Space) or 
                           UserInputService:IsKeyDown(Enum.KeyCode.ButtonA) or
@@ -303,7 +296,7 @@ SG.IgnoreGuiInset = true
 SG.Parent = CoreGui
 
 local MF = Instance.new("Frame")
-MF.Size = UDim2.new(0, 550, 0, 300) -- Landscape Size
+MF.Size = UDim2.new(0, 550, 0, 300)
 MF.Position = UDim2.new(0.5, -275, 0.5, -150)
 MF.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 MF.BorderSizePixel = 0
@@ -321,11 +314,11 @@ bgImg.BackgroundTransparency = 1
 bgImg.Image = "rbxassetid://118004643139453" 
 bgImg.ScaleType = Enum.ScaleType.Crop
 bgImg.ZIndex = 1
-bgImg.ImageTransparency = 0 -- 0 = Full Visibility
+bgImg.ImageTransparency = 0
 bgImg.Parent = MF
 Instance.new("UICorner", bgImg).CornerRadius = UDim.new(0, 12)
 
--- Dark Overlay (Para mabasa yung text)
+-- Dark Overlay
 local overlay = Instance.new("Frame")
 overlay.Size = UDim2.new(1, 0, 1, 0)
 overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -334,16 +327,13 @@ overlay.ZIndex = 2
 overlay.Parent = MF
 Instance.new("UICorner", overlay).CornerRadius = UDim.new(0, 12)
 
--- Draggable Logic
+-- Draggable Logic (MENU)
 local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
 MF.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
         dragStart = input.Position
         startPos = MF.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
-        end)
     end
 end)
 MF.InputChanged:Connect(function(input)
@@ -354,6 +344,9 @@ UserInputService.InputChanged:Connect(function(input)
         local delta = input.Position - dragStart
         MF.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
 end)
 
 -- HEADER
@@ -471,4 +464,23 @@ local toggleBtn = Instance.new("TextButton")
 toggleBtn.Size = UDim2.fromOffset(60, 60); toggleBtn.Position = UDim2.new(0.5, -30, 1, -95); toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 215, 0); toggleBtn.Text = "⚡"; toggleBtn.TextColor3 = Color3.fromRGB(0, 0, 0); toggleBtn.TextSize = 24; toggleBtn.Font = Enum.Font.GothamBold; toggleBtn.Parent = SG
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
 
-local drag, dragStart, startPos = false, nil, nil
+local dragBtn, dragStartBtn, startPosBtn = false, nil, nil
+toggleBtn.InputBegan:Connect(function(input) 
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then 
+        dragBtn = true; dragStartBtn = input.Position; startPosBtn = toggleBtn.Position 
+    end 
+end)
+UserInputService.InputChanged:Connect(function(input) 
+    if dragBtn and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then 
+        local delta = input.Position - dragStartBtn
+        toggleBtn.Position = UDim2.new(startPosBtn.X.Scale, startPosBtn.X.Offset + delta.X, startPosBtn.Y.Scale, startPosBtn.Y.Offset + delta.Y) 
+    end 
+end)
+UserInputService.InputEnded:Connect(function(input) 
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then 
+        dragBtn = false
+        if startPosBtn and math.abs(input.Position.X - dragStartBtn.X) < 10 and math.abs(input.Position.Y - dragStartBtn.Y) < 10 then 
+            MF.Visible = not MF.Visible 
+        end 
+    end 
+end
