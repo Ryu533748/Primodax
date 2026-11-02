@@ -4,7 +4,7 @@
 -- ██╔═══╝ ██╔══██╗██║██║╚██╔╝██║██║   ██║██║  ██║██╔══██║ ██╔██╗
 -- ██║     ██║  ██║██║██║ ╚═╝ ██║╚██████╔╝██████╔╝██║  ██║██╔╝ ██╗
 -- ╚═╝     ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
--- PRIMODAX VGRANT v7.2 | UI FIXED | GODMODE | FLY JUMP
+-- PRIMODAX VGRANT v7.3 | FIXED SYNTAX & DRAG | GODMODE
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -483,4 +483,6 @@ UserInputService.InputEnded:Connect(function(input)
             MF.Visible = not MF.Visible 
         end 
     end 
-end
+end)
+
+print("✅ PRIMODAX v7.3 Loaded — Syntax Fixed")
