@@ -1,4 +1,4 @@
--- PrimoDax Hub | Vagrant Survival v10
+-- PrimoDax Hub | Vagrant Survival
 -- Created By: BoboyTagaAquarius
 
 local Players          = game:GetService("Players")
@@ -14,17 +14,13 @@ local Cam = Workspace.CurrentCamera
 
 local CFG = {
     -- Combat
-    SilentAim       = false, Aimbot          = false,
-    AimbotSmooth    = 15,    FOVRange        = 150,
-    TargetPart      = "Head", WallCheck      = false,
+    SilentAim = false, WallCheck = false, TargetPart = "HumanoidRootPart", Priority = "Crosshair", AutoFire = false, VisibleCheck = false, RageTarget = "Head", MaxDistance = 500,
+    Aimbot = false, AimbotSmooth = 15, FOVRange = 150,
+    NoRecoil = false, NoSpread = false,
     -- Visual
-    PlayerESP       = false, GunESP          = false,
+    PlayerESP = false, NameESP = false, DistanceESP = false, HealthBar = false, Chams = false, GunESP = false,
     -- Player
-    WalkSpeed       = 16,    FlySpeed        = 60,
-    IsFlying        = false, InfiniteJump    = false,
-    AutoSprint      = false, SprintSpeed     = 22,
-    NoClip          = false, InstantProx     = false,
-    GodMode         = false, AutoClick       = false
+    WalkSpeed = 16, FlySpeed = 60, IsFlying = false, InfiniteJump = false, AutoSprint = false, SprintSpeed = 22, NoClip = false, GodMode = false
 }
 
 -- ============ UTILS ============
@@ -33,115 +29,50 @@ local function getRoot()  local c = getChar(); return c and c:FindFirstChild("Hu
 local function getHum()   local c = getChar(); return c and c:FindFirstChildOfClass("Humanoid") end
 local function isAlive(p) local h = p and p.Character and p.Character:FindFirstChildOfClass("Humanoid"); return h and h.Health > 0 end
 
-local function isVisible(targetPart, camPos)
-    if not CFG.WallCheck then return true end
-    local rayParams = RaycastParams.new()
-    rayParams.FilterType = Enum.RaycastFilterType.Exclude
-    rayParams.FilterDescendantsInstances = {LP.Character, Cam}
-    local result = Workspace:Raycast(camPos, targetPart.Position - camPos, rayParams)
-    if result and result.Instance then
-        return result.Instance:IsDescendantOf(targetPart.Parent)
-    end
-    return true
-end
-
 -- ============ ESP ============
 local espObjects = {}
-local gunESPObjects = {}
-
 local function createESP(player)
     if espObjects[player] or player == LP then return end
     local box = Drawing.new("Square")
     box.Thickness = 1; box.Color = Color3.fromRGB(255, 50, 50); box.Filled = false; box.Visible = false
     local name = Drawing.new("Text")
     name.Size = 14; name.Center = true; name.Outline = true; name.Color = Color3.fromRGB(255, 255, 255); name.Visible = false
-    espObjects[player] = {Box = box, Name = name}
+    local dist = Drawing.new("Text")
+    dist.Size = 12; dist.Center = true; dist.Outline = true; dist.Color = Color3.fromRGB(200, 200, 200); dist.Visible = false
+    espObjects[player] = {Box = box, Name = name, Dist = dist}
 end
 
 for _, p in ipairs(Players:GetPlayers()) do createESP(p) end
 Players.PlayerAdded:Connect(createESP)
 Players.PlayerRemoving:Connect(function(p)
     if espObjects[p] then
-        espObjects[p].Box:Remove(); espObjects[p].Name:Remove(); espObjects[p] = nil
-    end
-end)
-
-task.spawn(function()
-    while task.wait(0.5) do
-        if not CFG.GunESP then
-            for obj, drawing in pairs(gunESPObjects) do
-                drawing.Text:Remove(); drawing.Dist:Remove(); gunESPObjects[obj] = nil
-            end
-        else
-            for obj, drawing in pairs(gunESPObjects) do
-                if not obj or not obj.Parent then
-                    drawing.Text:Remove(); drawing.Dist:Remove(); gunESPObjects[obj] = nil
-                end
-            end
-            for _, obj in ipairs(Workspace:GetDescendants()) do
-                if obj:IsA("Model") or obj:IsA("Tool") or obj:IsA("BasePart") then
-                    local name = obj.Name:lower()
-                    if name:find("gun") or name:find("crossbow") or name:find("weapon") or name:find("rifle") or name:find("pistol") or name:find("shotgun") or name:find("revolver") then
-                        local part = obj:IsA("BasePart") and obj or obj:FindFirstChildOfClass("BasePart")
-                        if part and not gunESPObjects[obj] then
-                            local text = Drawing.new("Text"); text.Size = 14; text.Center = true; text.Outline = true; text.Color = Color3.fromRGB(0, 255, 255)
-                            local dist = Drawing.new("Text"); dist.Size = 12; dist.Center = true; dist.Outline = true; dist.Color = Color3.fromRGB(255, 255, 255)
-                            gunESPObjects[obj] = {Text = text, Dist = dist}
-                        end
-                    end
-                end
-            end
-        end
+        espObjects[p].Box:Remove(); espObjects[p].Name:Remove(); espObjects[p].Dist:Remove(); espObjects[p] = nil
     end
 end)
 
 RunService.RenderStepped:Connect(function()
-    -- Player ESP
-    if CFG.PlayerESP then
-        for player, esp in pairs(espObjects) do
-            if isAlive(player) then
-                local char = player.Character
-                local head = char and char:FindFirstChild("Head")
-                if head then
-                    local pos, onS = Cam:WorldToViewportPoint(head.Position)
-                    if onS then
-                        esp.Box.Visible = true; esp.Box.Size = Vector2.new(40, 50)
-                        esp.Box.Position = Vector2.new(pos.X - 20, pos.Y - 25)
-                        esp.Name.Visible = true; esp.Name.Text = player.Name
-                        esp.Name.Position = Vector2.new(pos.X, pos.Y - 40)
-                    else
-                        esp.Box.Visible = false; esp.Name.Visible = false
+    for player, esp in pairs(espObjects) do
+        if CFG.PlayerESP and isAlive(player) then
+            local head = player.Character:FindFirstChild("Head")
+            if head then
+                local pos, onS = Cam:WorldToViewportPoint(head.Position)
+                if onS then
+                    esp.Box.Visible = true; esp.Box.Size = Vector2.new(40, 50)
+                    esp.Box.Position = Vector2.new(pos.X - 20, pos.Y - 25)
+                    esp.Name.Visible = CFG.NameESP; esp.Name.Text = player.Name
+                    esp.Name.Position = Vector2.new(pos.X, pos.Y - 40)
+                    local root = getRoot()
+                    if root then
+                        esp.Dist.Visible = CFG.DistanceESP
+                        esp.Dist.Text = math.floor((root.Position - head.Position).Magnitude) .. "m"
+                        esp.Dist.Position = Vector2.new(pos.X, pos.Y + 30)
                     end
-                end
-            else
-                esp.Box.Visible = false; esp.Name.Visible = false
-            end
-        end
-    else
-        for _, esp in pairs(espObjects) do esp.Box.Visible = false; esp.Name.Visible = false end
-    end
-
-    -- Gun ESP
-    if CFG.GunESP then
-        for obj, drawing in pairs(gunESPObjects) do
-            if obj and obj.Parent then
-                local part = obj:IsA("BasePart") and obj or obj:FindFirstChildOfClass("BasePart")
-                if part then
-                    local screenPos, onScreen = Cam:WorldToViewportPoint(part.Position)
-                    if onScreen then
-                        local myRoot = getRoot()
-                        local distance = myRoot and math.floor((myRoot.Position - part.Position).Magnitude) or 0
-                        drawing.Text.Text = "[" .. obj.Name .. "]"
-                        drawing.Text.Position = Vector2.new(screenPos.X, screenPos.Y - 20)
-                        drawing.Text.Visible = true
-                        drawing.Dist.Text = "[" .. tostring(distance) .. " studs]"
-                        drawing.Dist.Position = Vector2.new(screenPos.X, screenPos.Y)
-                        drawing.Dist.Visible = true
-                    else
-                        drawing.Text.Visible = false; drawing.Dist.Visible = false
-                    end
+                else
+                    esp.Box.Visible = false; esp.Name.Visible = false; esp.Dist.Visible = false
                 end
             end
+        else
+            esp.Box.Visible = false; esp.Name.Visible = false; esp.Dist.Visible = false
         end
     end
 end)
@@ -150,7 +81,7 @@ end)
 local activeTarget = nil
 local fovCircle = Drawing.new("Circle")
 fovCircle.Thickness = 1.5
-fovCircle.Color = Color3.fromRGB(170, 100, 255) -- Purple FOV
+fovCircle.Color = Color3.fromRGB(170, 100, 255)
 fovCircle.Filled = false
 fovCircle.Visible = false
 
@@ -170,8 +101,10 @@ RunService.RenderStepped:Connect(function()
                     local sPos, onS = Cam:WorldToViewportPoint(tPart.Position)
                     if onS then
                         local dist2D = (Vector2.new(sPos.X, sPos.Y) - center).Magnitude
-                        if dist2D < bDist and isVisible(tPart, Cam.CFrame.Position) then
-                            bestT = p; bDist = dist2D 
+                        if dist2D < bDist then
+                            if (root.Position - tPart.Position).Magnitude <= CFG.MaxDistance then
+                                bestT = p; bDist = dist2D 
+                            end
                         end
                     end
                 end
@@ -190,59 +123,30 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Silent Aim Hook
+-- Silent Aim Hook (Safe Mode)
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local method = getnamecallmethod()
-    local args = { ... }
-    
-    if CFG.SilentAim and (method == "FireServer" or method == "InvokeServer") then
-        if activeTarget and isAlive(activeTarget) then
-            local targetPart = activeTarget.Character:FindFirstChild(CFG.TargetPart)
-            if targetPart then
-                for i, v in ipairs(args) do
-                    if typeof(v) == "Vector3" then 
-                        args[i] = targetPart.Position
-                    elseif typeof(v) == "CFrame" then 
-                        args[i] = CFrame.lookAt(Cam.CFrame.Position, targetPart.Position)
-                    elseif typeof(v) == "Instance" and v:IsA("BasePart") then 
-                        args[i] = targetPart 
+    pcall(function()
+        local method = getnamecallmethod()
+        local args = { ... }
+        
+        if CFG.SilentAim and (method == "FireServer" or method == "InvokeServer") then
+            if activeTarget and isAlive(activeTarget) then
+                local targetPart = activeTarget.Character:FindFirstChild(CFG.TargetPart)
+                if targetPart then
+                    for i, v in ipairs(args) do
+                        if typeof(v) == "Vector3" then args[i] = targetPart.Position
+                        elseif typeof(v) == "CFrame" then args[i] = CFrame.lookAt(Cam.CFrame.Position, targetPart.Position)
+                        elseif typeof(v) == "Instance" and v:IsA("BasePart") then args[i] = targetPart end
                     end
                 end
             end
         end
-    end
-    return oldNamecall(self, table.unpack(args))
-end)
-
-local oldIndex
-oldIndex = hookmetamethod(game, "__index", function(self, key)
-    if CFG.SilentAim and activeTarget and isAlive(activeTarget) then
-        local targetPart = activeTarget.Character:FindFirstChild(CFG.TargetPart)
-        if targetPart then
-            if key == "Hit" or key == "Target" or key == "MouseHit" then
-                return targetPart
-            elseif key == "UnitRay" and self == Cam then
-                return Ray.new(Cam.CFrame.Position, (targetPart.Position - Cam.CFrame.Position).Unit)
-            end
-        end
-    end
-    return oldIndex(self, key)
+        return oldNamecall(self, table.unpack(args))
+    end)
 end)
 
 -- ============ CORE FEATURES ============
-task.spawn(function()
-    while task.wait(0.1) do
-        if CFG.AutoClick then
-            pcall(function()
-                VirtualUser:CaptureController()
-                VirtualUser:ClickButton1(Vector2.new(Cam.ViewportSize.X/2, Cam.ViewportSize.Y/2))
-            end)
-        end
-    end
-end)
-
--- Infinite Jump
 UserInputService.JumpRequest:Connect(function()
     if CFG.InfiniteJump then
         local hum = getHum(); local root = getRoot()
@@ -255,22 +159,24 @@ UserInputService.JumpRequest:Connect(function()
 end)
 
 RunService.Heartbeat:Connect(function()
-    local root = getRoot(); local hum = getHum(); local char = getChar()
-    if not root or not hum or not char then return end
-    
-    if CFG.GodMode and hum.Health < hum.MaxHealth then hum.Health = hum.MaxHealth end
-    
-    -- Auto Sprint
-    if CFG.AutoSprint then
-        if hum.WalkSpeed < CFG.SprintSpeed then hum.WalkSpeed = CFG.SprintSpeed end
-    else
-        if hum.WalkSpeed == CFG.SprintSpeed then hum.WalkSpeed = 16 end
-    end
-    if CFG.NoClip then 
-        for _, p in ipairs(char:GetDescendants()) do 
-            if p:IsA("BasePart") then p.CanCollide = false end 
-        end 
-    end
+    pcall(function()
+        local root = getRoot(); local hum = getHum(); local char = getChar()
+        if not root or not hum or not char then return end
+        
+        if CFG.GodMode and hum.Health < hum.MaxHealth then hum.Health = hum.MaxHealth end
+        
+        if CFG.AutoSprint then
+            if hum.WalkSpeed < CFG.SprintSpeed then hum.WalkSpeed = CFG.SprintSpeed end
+        else
+            if hum.WalkSpeed == CFG.SprintSpeed then hum.WalkSpeed = 16 end
+        end
+
+        if CFG.NoClip then 
+            for _, p in ipairs(char:GetDescendants()) do 
+                if p:IsA("BasePart") then p.CanCollide = false end 
+            end 
+        end
+    end)
 end)
 
 -- Fly
@@ -287,22 +193,24 @@ local function stopFly()
 end
 
 RunService.Heartbeat:Connect(function()
-    if CFG.IsFlying then
-        if not BodyVel then startFly() end
-        local hum = getHum(); if hum then hum.PlatformStand = true end
-        local dir = Vector3.new(0,0,0)
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + Cam.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - Cam.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - Cam.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + Cam.CFrame.RightVector end
-        if BodyVel then BodyVel.Velocity = dir.Magnitude > 0 and dir.Unit * CFG.FlySpeed or Vector3.new(0,0,0) end
-        if BodyGyr then BodyGyr.CFrame = Cam.CFrame end
-    else
-        if BodyVel then stopFly() end
-    end
+    pcall(function()
+        if CFG.IsFlying then
+            if not BodyVel then startFly() end
+            local hum = getHum(); if hum then hum.PlatformStand = true end
+            local dir = Vector3.new(0,0,0)
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + Cam.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - Cam.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - Cam.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + Cam.CFrame.RightVector end
+            if BodyVel then BodyVel.Velocity = dir.Magnitude > 0 and dir.Unit * CFG.FlySpeed or Vector3.new(0,0,0) end
+            if BodyGyr then BodyGyr.CFrame = Cam.CFrame end
+        else
+            if BodyVel then stopFly() end
+        end
+    end)
 end)
 
--- ============ UI SYSTEM ============
+-- ============ UI SYSTEM (POTYZIUM STYLE) ============
 local parentGui = gethui and gethui() or CoreGui
 if parentGui:FindFirstChild("PrimoDaxUI") then parentGui:FindFirstChild("PrimoDaxUI"):Destroy() end
 
@@ -504,26 +412,37 @@ local c1 = mkCard(PageCombat, "Silent Aim", 1)
 mkToggle(c1, "Enable Silent Aim", "SilentAim", 1)
 mkToggle(c1, "Wall Check", "WallCheck", 2)
 mkDropdown(c1, "Target Part", "TargetPart", {"Head","HumanoidRootPart","Torso"}, 3)
+mkDropdown(c1, "Priority", "Priority", {"Crosshair", "Distance"}, 4)
 
-local c2 = mkCard(PageCombat, "Aimbot", 2)
-mkToggle(c2, "Enable Aimbot", "Aimbot", 1)
-mkSlider(c2, "Aimbot Smooth (Kapit)", "AimbotSmooth", 0, 100, 2)
-mkSlider(c2, "FOV Radius", "FOVRange", 0, 800, 3)
+local c2 = mkCard(PageCombat, "Rage Bot", 2)
+mkToggle(c2, "Enable Rage Bot", "AutoFire", 1)
+mkToggle(c2, "Visible Check", "VisibleCheck", 2)
+mkDropdown(c2, "Target Part", "RageTarget", {"Head","HumanoidRootPart","Torso"}, 3)
+mkSlider(c2, "Max Distance", "MaxDistance", 50, 1000, 4)
+
+local c3 = mkCard(PageCombat, "Weapons Mod", 3)
+mkToggle(c3, "No Recoil", "NoRecoil", 1)
+mkToggle(c3, "No Spread", "NoSpread", 2)
 
 -- POPULATE VISUAL
-local c3 = mkCard(PageVisual, "ESP", 1)
-mkToggle(c3, "Player ESP", "PlayerESP", 1)
-mkToggle(c3, "Gun ESP (Loot)", "GunESP", 2)
+local c4 = mkCard(PageVisual, "ESP", 1)
+mkToggle(c4, "Enable ESP", "PlayerESP", 1)
+mkToggle(c4, "Box ESP", "BoxESP", 2)
+mkToggle(c4, "Name ESP", "NameESP", 3)
+mkToggle(c4, "Distance ESP", "DistanceESP", 4)
+mkToggle(c4, "Health Bar", "HealthBar", 5)
+mkToggle(c4, "Chams", "Chams", 6)
+mkToggle(c4, "Gun ESP", "GunESP", 7)
 
 -- POPULATE PLAYER
-local c4 = mkCard(PagePlayer, "Movement", 1)
-mkToggle(c4, "Fly", "IsFlying", 1)
-mkSlider(c4, "Fly Speed", "FlySpeed", 10, 400, 2)
-mkToggle(c4, "Infinite Jump", "InfiniteJump", 3)
-mkToggle(c4, "Auto Sprint", "AutoSprint", 4)
-mkSlider(c4, "Sprint Speed", "SprintSpeed", 16, 100, 5)
-mkToggle(c4, "No Clip", "NoClip", 6)
-mkToggle(c4, "GodMode", "GodMode", 7)
+local c5 = mkCard(PagePlayer, "Movement", 1)
+mkToggle(c5, "Fly", "IsFlying", 1)
+mkSlider(c5, "Fly Speed", "FlySpeed", 10, 400, 2)
+mkToggle(c5, "Infinite Jump", "InfiniteJump", 3)
+mkToggle(c5, "Auto Sprint", "AutoSprint", 4)
+mkSlider(c5, "Sprint Speed", "SprintSpeed", 16, 100, 5)
+mkToggle(c5, "No Clip", "NoClip", 6)
+mkToggle(c5, "GodMode", "GodMode", 7)
 
 -- Initial Tab
 tabC.TextColor3 = TXT_MAIN
