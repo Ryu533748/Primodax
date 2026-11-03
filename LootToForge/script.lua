@@ -1,88 +1,57 @@
--- ██████╗ ██████╗ ██╗███╗   ███╗ ██████╗ ██████╗  █████╗ ██╗  ██╗
--- ██╔══██╗██╔══██╗██║████╗ ████║██╔═══██╗██╔══██╗██╔══██╗╚██╗██╔╝
--- ██████╔╝██████╔╝██║██╔████╔██║██║   ██║██║  ██║███████║ ╚███╔╝
--- ██╔═══╝ ██╔══██╗██║██║╚██╔╝██║██║   ██║██║  ██║██╔══██║ ██╔██╗
--- ██║     ██║  ██║██║██║ ╚═╝ ██║╚██████╔╝██████╔╝██║  ██║██╔╝ ██╗
--- ╚═╝     ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
--- PRIMODAX HUB | LOOT TO FORGE
--- Created By: BoboyTagaAquarius
+--[[
+    PRIMODAX HUB | LOOT TO FORGE - FIXED BUILD
+    Created By: BoboyTagaAquarius
+    Fixes: HttpService, parentGui fallback, Main sequence, fps tracker, prompt/click globals
+]]
 
-local Players          = game:GetService("Players")
-local RunService       = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local TweenService     = game:GetService("TweenService")
-local Workspace        = game:GetService("Workspace")
-local CoreGui          = game:GetService("CoreGui")
-local ReplicatedStorage= game:GetService("ReplicatedStorage")
-local VirtualUser      = game:GetService("VirtualUser")
-local TeleportService  = game:GetService("TeleportService")
-local StarterGui       = game:GetService("StarterGui")
+local Players           = game:GetService("Players")
+local RunService        = game:GetService("RunService")
+local UserInputService  = game:GetService("UserInputService")
+local TweenService      = game:GetService("TweenService")
+local Workspace         = game:GetService("Workspace")
+local CoreGui           = game:GetService("CoreGui")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser       = game:GetService("VirtualUser")
+local TeleportService   = game:GetService("TeleportService")
+local StarterGui        = game:GetService("StarterGui")
+local HttpService       = game:GetService("HttpService")
 
 local LP  = Players.LocalPlayer
 local Cam = Workspace.CurrentCamera
 
--- ════════════════════════════════════════
---              CONFIG
--- ════════════════════════════════════════
 local CFG = {
-    -- Farming
-    InfiniteMoney    = false,
-    AutoDungeonLoot  = false,
-    AutoSuperLoot    = false,
-    AutoUpgrade      = false,
-    AutoTrain        = false,
-    AutoRebirth      = false,
-    ClicksPerSecond  = 10,
-
-    -- Enchant
-    AutoEnchant      = false,
-    AutoEnchantHat   = false,
-
-    -- Race
-    AutoRollRace     = false,
-    RollUntil        = "None",
-
-    -- Forge
-    AutoForge        = false,
-    AutoForgeHat     = false,
-    AutoForgeArmor   = false,
-    InstantForge     = false,
-    AutoEquipBest    = false,
-    SellOldGear      = false,
-
-    -- Ores
-    InfiniteOres     = false,
-    PickOres         = false,
-
-    -- Extras
-    InstantKill      = false,
-    GodMode          = false,
-    AutoClaim        = false,
-    DisableNotif     = false,
-
-    -- Player
-    WalkSpeedEnabled = false,
-    WalkSpeed        = 32,
-    Fly              = false,
-    FlySpeed         = 60,
-    InfiniteJump     = false,
-    NoClip           = false,
-
-    -- Anti
-    AntiAFK          = true,
+    InfiniteMoney = false, AutoDungeonLoot = false, AutoSuperLoot = false,
+    AutoUpgrade = false, AutoTrain = false, AutoRebirth = false, ClicksPerSecond = 10,
+    AutoEnchant = false, AutoEnchantHat = false,
+    AutoRollRace = false, RollUntil = "None",
+    AutoForge = false, AutoForgeHat = false, AutoForgeArmor = false,
+    InstantForge = false, AutoEquipBest = false, SellOldGear = false,
+    InfiniteOres = false, PickOres = false,
+    InstantKill = false, GodMode = false, AutoClaim = false, DisableNotif = false,
+    WalkSpeedEnabled = false, WalkSpeed = 32,
+    Fly = false, FlySpeed = 60, InfiniteJump = false, NoClip = false,
+    AntiAFK = true,
 }
 
--- ════════════════════════════════════════
---              UTILS
--- ════════════════════════════════════════
+-- FPS tracker
+local fpsCounter, fpsTime, currentFPS = 0, os.clock(), 0
+RunService.Heartbeat:Connect(function()
+    fpsCounter = fpsCounter + 1
+    local now = os.clock()
+    if now - fpsTime >= 1 then
+        currentFPS = fpsCounter
+        fpsCounter = 0
+        fpsTime    = now
+    end
+end)
+local function getFPS() return currentFPS end
+
 local function getChar() return LP.Character end
 local function getRoot()
-    local c = getChar()
-    return c and c:FindFirstChild("HumanoidRootPart")
+    local c = getChar(); return c and c:FindFirstChild("HumanoidRootPart")
 end
 local function getHum()
-    local c = getChar()
-    return c and c:FindFirstChildOfClass("Humanoid")
+    local c = getChar(); return c and c:FindFirstChildOfClass("Humanoid")
 end
 
 local function fireRE(name, ...)
@@ -91,27 +60,26 @@ local function fireRE(name, ...)
         pcall(function() re:FireServer(...) end)
     end
 end
-
 local function invokeRF(name, ...)
     local rf = ReplicatedStorage:FindFirstChild(name, true)
     if rf and rf:IsA("RemoteFunction") then
         pcall(function() rf:InvokeServer(...) end)
     end
 end
-
 local function notify(title, text)
     pcall(function()
-        StarterGui:SetCore("SendNotification", {
-            Title   = title,
-            Text    = text,
-            Duration= 3,
-        })
+        StarterGui:SetCore("SendNotification", { Title = title, Text = text, Duration = 3 })
     end)
 end
 
--- ════════════════════════════════════════
---              ANTI AFK
--- ════════════════════════════════════════
+local function _fireProx(p)
+    if fireproximityprompt then pcall(fireproximityprompt, p) end
+end
+local function _fireClick(c)
+    if fireclickdetector then pcall(fireclickdetector, c) end
+end
+
+-- ANTI AFK
 task.spawn(function()
     while true do
         task.wait(60)
@@ -124,87 +92,65 @@ task.spawn(function()
     end
 end)
 
--- ════════════════════════════════════════
---              DISABLE NOTIFICATIONS
--- ════════════════════════════════════════
+-- DISABLE NOTIF
 RunService.Heartbeat:Connect(function()
     if CFG.DisableNotif then
-        pcall(function()
-            StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
-        end)
+        pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false) end)
     end
 end)
 
--- ════════════════════════════════════════
---         GOD MODE
--- ════════════════════════════════════════
+-- GOD MODE
 RunService.Heartbeat:Connect(function()
     local hum = getHum()
     if hum and CFG.GodMode then
-        hum.Health    = hum.MaxHealth
         hum.MaxHealth = math.huge
+        hum.Health    = hum.MaxHealth
     end
 end)
 
--- ════════════════════════════════════════
---         INSTANT KILL
--- ════════════════════════════════════════
+-- INSTANT KILL
 RunService.Heartbeat:Connect(function()
     if not CFG.InstantKill then return end
     for _, obj in ipairs(Workspace:GetDescendants()) do
         local hum = obj:FindFirstChildOfClass("Humanoid")
-        if hum and obj ~= getChar() then
-            local h = obj:FindFirstChildOfClass("Humanoid")
-            if h and h.Health > 0 then
-                pcall(function() h.Health = 0 end)
-            end
+        if hum and obj ~= getChar() and hum.Health > 0 then
+            pcall(function() hum.Health = 0 end)
         end
     end
 end)
 
--- ════════════════════════════════════════
---         INFINITE ORES
--- ════════════════════════════════════════
+-- INFINITE ORES
 RunService.Heartbeat:Connect(function()
     if not CFG.InfiniteOres then return end
-    fireRE("InfiniteOres")
-    fireRE("AddOre")
+    fireRE("InfiniteOres"); fireRE("AddOre")
 end)
 
--- ════════════════════════════════════════
---         PICK ORES
--- ════════════════════════════════════════
+-- PICK ORES
 task.spawn(function()
     while true do
         task.wait(0.5)
         if CFG.PickOres then
             local root = getRoot()
-            if not root then continue end
-            for _, obj in ipairs(Workspace:GetDescendants()) do
-                local name = obj.Name:lower()
-                if name:find("ore") and obj:IsA("BasePart") then
-                    root.CFrame = CFrame.new(obj.Position + Vector3.new(0,3,0))
-                    pcall(function()
+            if root then
+                for _, obj in ipairs(Workspace:GetDescendants()) do
+                    if obj:IsA("BasePart") and obj.Name:lower():find("ore") then
+                        root.CFrame = CFrame.new(obj.Position + Vector3.new(0,3,0))
                         for _, v in ipairs(obj:GetDescendants()) do
-                            if v:IsA("ProximityPrompt") then fireproximityprompt(v) end
-                            if v:IsA("ClickDetector")   then fireclickdetector(v)   end
+                            if v:IsA("ProximityPrompt") then _fireProx(v) end
+                            if v:IsA("ClickDetector")   then _fireClick(v) end
                         end
-                    end)
-                    break
+                        break
+                    end
                 end
             end
         end
     end
 end)
 
--- ════════════════════════════════════════
---         MAIN FARM LOOP
--- ════════════════════════════════════════
+-- MAIN FARM LOOP
 task.spawn(function()
     while true do
         task.wait(1 / math.max(CFG.ClicksPerSecond, 1))
-
-        -- Auto Train (click center)
         if CFG.AutoTrain then
             pcall(function()
                 VirtualUser:CaptureController()
@@ -220,117 +166,52 @@ end)
 task.spawn(function()
     while true do
         task.wait(1)
-
-        -- Auto Rebirth
         if CFG.AutoRebirth then
-            fireRE("Rebirth")
-            fireRE("RebirthEvent")
-            fireRE("DoRebirth")
+            fireRE("Rebirth"); fireRE("RebirthEvent"); fireRE("DoRebirth")
         end
-
-        -- Auto Upgrade
         if CFG.AutoUpgrade then
-            fireRE("BuyUpgrade")
-            fireRE("Upgrade")
-            fireRE("PurchaseUpgrade")
+            fireRE("BuyUpgrade"); fireRE("Upgrade"); fireRE("PurchaseUpgrade")
         end
-
-        -- Auto Dungeon Loot
         if CFG.AutoDungeonLoot then
-            fireRE("FarmDungeon")
-            fireRE("StartDungeon")
-            fireRE("CollectDungeonLoot")
+            fireRE("FarmDungeon"); fireRE("StartDungeon"); fireRE("CollectDungeonLoot")
         end
-
-        -- Auto Super Loot
         if CFG.AutoSuperLoot then
-            fireRE("SuperLoot")
-            fireRE("CollectSuperLoot")
-            -- also teleport to any loot
+            fireRE("SuperLoot"); fireRE("CollectSuperLoot")
             local root = getRoot()
             if root then
                 for _, obj in ipairs(Workspace:GetDescendants()) do
                     local name = obj.Name:lower()
-                    if (name:find("loot") or name:find("drop") or name:find("chest"))
-                    and obj:IsA("BasePart") then
+                    if obj:IsA("BasePart")
+                    and (name:find("loot") or name:find("drop") or name:find("chest")) then
                         root.CFrame = CFrame.new(obj.Position + Vector3.new(0,3,0))
-                        pcall(function()
-                            for _, v in ipairs(obj:GetDescendants()) do
-                                if v:IsA("ProximityPrompt") then fireproximityprompt(v) end
-                                if v:IsA("ClickDetector")   then fireclickdetector(v)   end
-                            end
-                        end)
+                        for _, v in ipairs(obj:GetDescendants()) do
+                            if v:IsA("ProximityPrompt") then _fireProx(v) end
+                            if v:IsA("ClickDetector")   then _fireClick(v) end
+                        end
                         break
                     end
                 end
             end
         end
-
-        -- Infinite Money
         if CFG.InfiniteMoney then
-            fireRE("AddMoney")
-            fireRE("GiveMoney")
-            fireRE("InfiniteMoney")
+            fireRE("AddMoney"); fireRE("GiveMoney"); fireRE("InfiniteMoney")
         end
-
-        -- Auto Forge
         if CFG.AutoForge then
-            fireRE("ForgeItem")
-            fireRE("Forge")
-            fireRE("ForgeWeapon")
+            fireRE("ForgeItem"); fireRE("Forge"); fireRE("ForgeWeapon")
         end
-
-        -- Auto Forge Hat
-        if CFG.AutoForgeHat then
-            fireRE("ForgeHat")
-            fireRE("ForgeHelmet")
-        end
-
-        -- Auto Forge Armor
-        if CFG.AutoForgeArmor then
-            fireRE("ForgeArmor")
-            fireRE("ForgeChest")
-        end
-
-        -- Instant Forge
-        if CFG.InstantForge then
-            fireRE("InstantForge")
-            fireRE("ForgeInstant")
-        end
-
-        -- Auto Equip Best
-        if CFG.AutoEquipBest then
-            fireRE("EquipBest")
-            fireRE("AutoEquip")
-        end
-
-        -- Sell Old Gear
-        if CFG.SellOldGear then
-            fireRE("SellOldGear")
-            fireRE("SellGear")
-        end
-
-        -- Auto Enchant
+        if CFG.AutoForgeHat then fireRE("ForgeHat"); fireRE("ForgeHelmet") end
+        if CFG.AutoForgeArmor then fireRE("ForgeArmor"); fireRE("ForgeChest") end
+        if CFG.InstantForge then fireRE("InstantForge"); fireRE("ForgeInstant") end
+        if CFG.AutoEquipBest then fireRE("EquipBest"); fireRE("AutoEquip") end
+        if CFG.SellOldGear then fireRE("SellOldGear"); fireRE("SellGear") end
         if CFG.AutoEnchant then
-            fireRE("EnchantWeapon")
-            fireRE("Enchant")
-            fireRE("AutoEnchant")
+            fireRE("EnchantWeapon"); fireRE("Enchant"); fireRE("AutoEnchant")
         end
-
-        -- Auto Enchant Hat
-        if CFG.AutoEnchantHat then
-            fireRE("EnchantHat")
-            fireRE("EnchantHelmet")
-        end
-
-        -- Auto Roll Race
+        if CFG.AutoEnchantHat then fireRE("EnchantHat"); fireRE("EnchantHelmet") end
         if CFG.AutoRollRace then
-            fireRE("RollRace")
-            fireRE("RerollRace")
+            fireRE("RollRace"); fireRE("RerollRace")
             if CFG.RollUntil ~= "None" then
-                -- check current race
-                local data = LP:FindFirstChild("leaderstats")
-                    or LP:FindFirstChild("Data")
+                local data = LP:FindFirstChild("leaderstats") or LP:FindFirstChild("Data")
                 if data then
                     local race = data:FindFirstChild("Race")
                     if race and race.Value == CFG.RollUntil then
@@ -340,19 +221,13 @@ task.spawn(function()
                 end
             end
         end
-
-        -- Auto Claim
         if CFG.AutoClaim then
-            fireRE("ClaimReward")
-            fireRE("ClaimDaily")
-            fireRE("Claim")
+            fireRE("ClaimReward"); fireRE("ClaimDaily"); fireRE("Claim")
         end
     end
 end)
 
--- ════════════════════════════════════════
---         MOVEMENT
--- ════════════════════════════════════════
+-- MOVEMENT
 local BodyVel, BodyGyr
 local function startFly()
     local root = getRoot(); if not root then return end
@@ -371,22 +246,18 @@ end
 
 UserInputService.JumpRequest:Connect(function()
     if CFG.InfiniteJump then
-        local hum  = getHum()
-        local root = getRoot()
+        local hum = getHum(); local root = getRoot()
         if hum and root and hum.Health > 0 then
             hum:ChangeState(Enum.HumanoidStateType.Jumping)
             task.wait()
             root.AssemblyLinearVelocity = Vector3.new(
-                root.AssemblyLinearVelocity.X, 75,
-                root.AssemblyLinearVelocity.Z
-            )
+                root.AssemblyLinearVelocity.X, 75, root.AssemblyLinearVelocity.Z)
         end
     end
 end)
 
 RunService.Heartbeat:Connect(function()
-    local hum  = getHum()
-    local char = getChar()
+    local hum = getHum(); local char = getChar()
     if not hum or not char then return end
 
     hum.WalkSpeed = CFG.WalkSpeedEnabled and CFG.WalkSpeed or 16
@@ -401,16 +272,14 @@ RunService.Heartbeat:Connect(function()
         if not BodyVel then startFly() end
         hum.PlatformStand = true
         local dir = Vector3.new(0,0,0)
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + Cam.CFrame.LookVector  end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - Cam.CFrame.LookVector  end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - Cam.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + Cam.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space)     then dir = dir + Vector3.new(0,1,0) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir = dir - Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += Cam.CFrame.LookVector  end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= Cam.CFrame.LookVector  end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= Cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += Cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space)     then dir += Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir -= Vector3.new(0,1,0) end
         if BodyVel then
-            BodyVel.Velocity = dir.Magnitude > 0
-                and dir.Unit * CFG.FlySpeed
-                or  Vector3.new(0,0,0)
+            BodyVel.Velocity = dir.Magnitude > 0 and dir.Unit * CFG.FlySpeed or Vector3.new(0,0,0)
         end
         if BodyGyr then BodyGyr.CFrame = Cam.CFrame end
     else
@@ -418,19 +287,30 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ════════════════════════════════════════
---              GUI
--- ════════════════════════════════════════
-local parentGui = (gethui and gethui()) or CoreGui
-if parentGui:FindFirstChild("PrimoDaxLTF") then
-    parentGui:FindFirstChild("PrimoDaxLTF"):Destroy()
+-- GUI
+local parentGui
+do
+    local ok = false
+    if gethui then
+        local success, res = pcall(gethui)
+        if success and res then parentGui = res; ok = true end
+    end
+    if not ok and CoreGui then
+        local success = pcall(function()
+            local t = Instance.new("Folder"); t.Parent = CoreGui; t:Destroy()
+        end)
+        if success then parentGui = CoreGui end
+    end
+    if not parentGui then parentGui = LP:WaitForChild("PlayerGui") end
 end
+
+local existing = parentGui:FindFirstChild("PrimoDaxLTF")
+if existing then existing:Destroy() end
 
 local ACCENT  = Color3.fromRGB(255, 105, 180)
 local BG_DARK = Color3.fromRGB(18, 18, 18)
 local BG_CARD = Color3.fromRGB(28, 28, 28)
 local BG_MID  = Color3.fromRGB(30, 30, 30)
-local BG_SIDE = Color3.fromRGB(22, 22, 26)
 local TXT     = Color3.fromRGB(220, 220, 220)
 local TXT_DIM = Color3.fromRGB(130, 130, 140)
 
@@ -438,10 +318,11 @@ local Gui = Instance.new("ScreenGui")
 Gui.Name           = "PrimoDaxLTF"
 Gui.ResetOnSpawn   = false
 Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+Gui.DisplayOrder   = 999
 Gui.Parent         = parentGui
 if protect_gui then pcall(protect_gui, Gui) end
 
--- ════════════ FLOATING BUTTON ════════════
+-- FLOATING BUTTON
 local FloatBtn = Instance.new("TextButton")
 FloatBtn.Size             = UDim2.new(0,45,0,45)
 FloatBtn.Position         = UDim2.new(0,20,0,20)
@@ -457,7 +338,6 @@ local fStroke = Instance.new("UIStroke", FloatBtn)
 fStroke.Color     = ACCENT
 fStroke.Thickness = 2
 
--- drag float button
 local fDrag, fDragStart, fStartPos = false, nil, nil
 FloatBtn.InputBegan:Connect(function(i)
     if i.UserInputType == Enum.UserInputType.MouseButton1
@@ -471,8 +351,7 @@ UserInputService.InputChanged:Connect(function(i)
         local d = i.Position - fDragStart
         FloatBtn.Position = UDim2.new(
             fStartPos.X.Scale, fStartPos.X.Offset + d.X,
-            fStartPos.Y.Scale, fStartPos.Y.Offset + d.Y
-        )
+            fStartPos.Y.Scale, fStartPos.Y.Offset + d.Y)
     end
 end)
 UserInputService.InputEnded:Connect(function(i)
@@ -481,7 +360,6 @@ UserInputService.InputEnded:Connect(function(i)
         if fDrag then
             local d = i.Position - fDragStart
             if math.abs(d.X) < 5 and math.abs(d.Y) < 5 then
-                -- toggle main menu on tap
                 local Main = Gui:FindFirstChild("MainMenu")
                 if Main then Main.Visible = not Main.Visible end
             end
@@ -490,7 +368,7 @@ UserInputService.InputEnded:Connect(function(i)
     end
 end)
 
--- ════════════ MAIN WINDOW ════════════
+-- MAIN WINDOW
 local Main = Instance.new("Frame")
 Main.Name             = "MainMenu"
 Main.Size             = UDim2.new(0,620,0,370)
@@ -503,10 +381,7 @@ Main.Parent           = Gui
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0,8)
 Instance.new("UIStroke", Main).Color = Color3.fromRGB(50,50,55)
 
--- drag main
 local mDrag, mDragStart, mStartPos = false, nil, nil
-
--- ════════════ TOP BAR ════════════
 local TopBar = Instance.new("Frame")
 TopBar.Name             = "TopBar"
 TopBar.Size             = UDim2.new(1,0,0,38)
@@ -527,8 +402,7 @@ UserInputService.InputChanged:Connect(function(i)
         local d = i.Position - mDragStart
         Main.Position = UDim2.new(
             mStartPos.X.Scale, mStartPos.X.Offset + d.X,
-            mStartPos.Y.Scale, mStartPos.Y.Offset + d.Y
-        )
+            mStartPos.Y.Scale, mStartPos.Y.Offset + d.Y)
     end
 end)
 UserInputService.InputEnded:Connect(function(i)
@@ -558,11 +432,8 @@ ByLabel.BackgroundTransparency = 1
 ByLabel.TextXAlignment = Enum.TextXAlignment.Left
 ByLabel.Parent         = TopBar
 
--- Tab buttons in top bar
 local tabNames = {"Home","Farm","Settings"}
-local tabBtnFrames = {}
 local tabBtns = {}
-
 local TabRow = Instance.new("Frame")
 TabRow.Size             = UDim2.new(0,250,0,28)
 TabRow.Position         = UDim2.new(0.5,-125,0.5,-14)
@@ -588,7 +459,7 @@ for _, name in ipairs(tabNames) do
 end
 
 local CloseBtn = Instance.new("TextButton")
-CloseBtn.Text             = "✕"
+CloseBtn.Text             = "X"
 CloseBtn.Font             = Enum.Font.GothamBold
 CloseBtn.TextSize         = 12
 CloseBtn.TextColor3       = Color3.fromRGB(255,80,80)
@@ -600,14 +471,12 @@ CloseBtn.Parent           = TopBar
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0,6)
 CloseBtn.MouseButton1Click:Connect(function() Main.Visible = false end)
 
--- ════════════ CONTENT AREA ════════════
 local ContentArea = Instance.new("Frame")
 ContentArea.Size             = UDim2.new(1,0,1,-38)
 ContentArea.Position         = UDim2.new(0,0,0,38)
 ContentArea.BackgroundTransparency = 1
 ContentArea.Parent           = Main
 
--- Pages
 local pages = {}
 local function makePage(name)
     local scroll = Instance.new("ScrollingFrame")
@@ -620,10 +489,8 @@ local function makePage(name)
     scroll.Visible             = false
     scroll.Parent              = ContentArea
     local pad = Instance.new("UIPadding", scroll)
-    pad.PaddingLeft   = UDim.new(0,8)
-    pad.PaddingRight  = UDim.new(0,8)
-    pad.PaddingTop    = UDim.new(0,8)
-    pad.PaddingBottom = UDim.new(0,8)
+    pad.PaddingLeft   = UDim.new(0,8); pad.PaddingRight  = UDim.new(0,8)
+    pad.PaddingTop    = UDim.new(0,8); pad.PaddingBottom = UDim.new(0,8)
     pages[name] = scroll
     return scroll
 end
@@ -631,20 +498,6 @@ end
 local pageHome     = makePage("Home")
 local pageFarm     = makePage("Farm")
 local pageSettings = makePage("Settings")
-
--- Farm page uses a grid layout
-local FarmGrid = Instance.new("Frame")
-FarmGrid.Size             = UDim2.new(1,0,0,0)
-FarmGrid.AutomaticSize    = Enum.AutomaticSize.Y
-FarmGrid.BackgroundTransparency = 1
-FarmGrid.Parent           = pageFarm
-local FarmGridLayout = Instance.new("UIGridLayout", FarmGrid)
-FarmGridLayout.CellSize    = UDim2.new(0.5,-6,0,0)
-FarmGridLayout.CellPadding = UDim2.new(0,6,0,6)
-FarmGridLayout.SortOrder   = Enum.SortOrder.LayoutOrder
-local FarmGridSizeConstraint = Instance.new("UIListLayout", FarmGrid)
--- remove the list layout, keep grid
-FarmGridSizeConstraint:Destroy()
 
 local function switchPage(name)
     for n, p in pairs(pages) do p.Visible = (n == name) end
@@ -662,7 +515,7 @@ for name, btn in pairs(tabBtns) do
     btn.MouseButton1Click:Connect(function() switchPage(name) end)
 end
 
--- ════════════ UI HELPERS ════════════
+-- UI HELPERS
 local function mkCard(parent, titleText, order)
     local card = Instance.new("Frame")
     card.Size             = UDim2.new(1,0,0,0)
@@ -771,7 +624,7 @@ local function mkSlider(parent, label, cfgKey, min, max, order)
     Instance.new("UICorner", bar).CornerRadius = UDim.new(1,0)
 
     local fill = Instance.new("Frame")
-    fill.Size             = UDim2.new((CFG[cfgKey]-min)/(max-min),0,1,0)
+    fill.Size             = UDim2.new((CFG[cfgKey]-min)/math.max(max-min,1),0,1,0)
     fill.BackgroundColor3 = ACCENT
     fill.BorderSizePixel  = 0
     fill.Parent           = bar
@@ -790,7 +643,7 @@ local function mkSlider(parent, label, cfgKey, min, max, order)
         if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
         or i.UserInputType == Enum.UserInputType.Touch) then
             local rel = math.clamp(
-                (i.Position.X - bar.AbsolutePosition.X)/bar.AbsoluteSize.X, 0, 1)
+                (i.Position.X - bar.AbsolutePosition.X)/math.max(bar.AbsoluteSize.X,1), 0, 1)
             local val = math.floor(min + rel*(max-min))
             CFG[cfgKey] = val
             fill.Size   = UDim2.new(rel,0,1,0)
@@ -826,7 +679,6 @@ local function mkDropdown(parent, label, cfgKey, options, order)
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent         = btn
 
-    -- dropdown list
     local list = Instance.new("Frame")
     list.Size             = UDim2.new(1,0,0,0)
     list.AutomaticSize    = Enum.AutomaticSize.Y
@@ -853,9 +705,9 @@ local function mkDropdown(parent, label, cfgKey, options, order)
         ob.ZIndex           = 21
         ob.Parent           = list
         ob.MouseButton1Click:Connect(function()
-            CFG[cfgKey]   = opt
-            lbl.Text      = label .. ": " .. opt
-            list.Visible  = false
+            CFG[cfgKey]  = opt
+            lbl.Text     = label .. ": " .. opt
+            list.Visible = false
         end)
     end
 
@@ -909,32 +761,27 @@ local function mkInfoRow(parent, label, valueFunc, order)
     val.TextXAlignment = Enum.TextXAlignment.Right
     val.Parent         = row
 
-    -- update value every second
     task.spawn(function()
         while val.Parent do
+            task.wait(1)
             if valueFunc then
                 pcall(function() val.Text = tostring(valueFunc()) end)
             end
-            task.wait(1)
         end
     end)
     return row
 end
 
--- ════════════════════════════════════════
---         PAGE: HOME
--- ════════════════════════════════════════
+-- PAGE: HOME
 local homeLayout = Instance.new("UIListLayout", pageHome)
 homeLayout.Padding   = UDim.new(0,8)
 homeLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 do
-    local c = mkCard(pageHome, "👤  Player Info", 1)
+    local c = mkCard(pageHome, "Player Info", 1)
     mkInfoRow(c, "Username", function() return LP.Name end, 1)
     mkInfoRow(c, "Display Name", function() return LP.DisplayName end, 2)
-    mkInfoRow(c, "FPS", function()
-        return math.floor(1/RunService.Heartbeat:Wait())
-    end, 3)
+    mkInfoRow(c, "FPS", function() return getFPS() end, 3)
     mkInfoRow(c, "Ping", function()
         return math.floor(LP:GetNetworkPing() * 1000) .. "ms"
     end, 4)
@@ -944,37 +791,45 @@ do
 end
 
 do
-    local c = mkCard(pageHome, "🌐  Server", 2)
+    local c = mkCard(pageHome, "Server", 2)
     mkButton(c, "Server Hop", function()
         pcall(function()
-            local servers = HttpService:GetAsync(
-                "https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"
-            )
-            -- fallback: just rejoin
+            local req = http_request or request or (syn and syn.request)
+            if req then
+                local res = req({
+                    Url = "https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100",
+                    Method = "GET"
+                })
+                if res and res.Body then
+                    local data = HttpService:JSONDecode(res.Body)
+                    if data and data.data and #data.data > 0 then
+                        local srv = data.data[math.random(1, #data.data)]
+                        TeleportService:TeleportToPlaceInstance(game.PlaceId, srv.id, LP)
+                        return
+                    end
+                end
+            end
             TeleportService:Teleport(game.PlaceId, LP)
         end)
     end, 1)
     mkButton(c, "Rejoin", function()
         TeleportService:Teleport(game.PlaceId, LP)
     end, 2)
-    mkButton(c, "Join Lowest Server", function()
-        TeleportService:Teleport(game.PlaceId, LP)
-    end, 3)
     mkButton(c, "Copy Universe ID", function()
         pcall(function() setclipboard(tostring(game.GameId)) end)
         notify("PrimoDax Hub", "Universe ID copied!")
-    end, 4)
+    end, 3)
     mkButton(c, "Copy Job ID", function()
         pcall(function() setclipboard(game.JobId) end)
         notify("PrimoDax Hub", "Job ID copied!")
-    end, 5)
+    end, 4)
 end
 
 do
-    local c = mkCard(pageHome, "💬  Community", 3)
+    local c = mkCard(pageHome, "Community", 3)
     mkButton(c, "Join Discord", function()
         pcall(function() setclipboard("https://discord.gg/krvsuC9jy") end)
-        notify("PrimoDax Hub", "Discord link copied! discord.gg/krvsuC9jy")
+        notify("PrimoDax Hub", "Discord link copied!")
     end, 1)
     mkButton(c, "Copy Support Website", function()
         pcall(function() setclipboard("https://discord.gg/krvsuC9jy") end)
@@ -982,21 +837,11 @@ do
     end, 2)
 end
 
--- ════════════════════════════════════════
---         PAGE: FARM (GRID CARDS)
--- ════════════════════════════════════════
--- Farm page grid
-local farmPageLayout = Instance.new("UIGridLayout", pageFarm)
-farmPageLayout.CellSize    = UDim2.new(0.5,-5,0,0)
-farmPageLayout.CellPadding = UDim2.new(0,6,0,6)
-farmPageLayout.SortOrder   = Enum.SortOrder.LayoutOrder
--- override: use list for proper sizing
-farmPageLayout:Destroy()
+-- PAGE: FARM (GRID CARDS)
 local farmListLayout = Instance.new("UIListLayout", pageFarm)
 farmListLayout.Padding   = UDim.new(0,6)
 farmListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
--- two-column grid wrapper
 local function mkGridRow(parent, order)
     local row = Instance.new("Frame")
     row.Size             = UDim2.new(1,0,0,0)
@@ -1042,76 +887,73 @@ end
 
 -- Row 1: Farming | Forge
 local row1 = mkGridRow(pageFarm, 1)
-local cFarming = mkGridCard(row1, "🌾 Farming", 1)
-mkToggle(cFarming, "Infinite Money",  "InfiniteMoney",   1)
+local cFarming = mkGridCard(row1, "Farming", 1)
+mkToggle(cFarming, "Infinite Money",   "InfiniteMoney",   1)
 mkToggle(cFarming, "Auto Dungeon Loot","AutoDungeonLoot", 2)
-mkToggle(cFarming, "Auto Super Loot", "AutoSuperLoot",   3)
-mkToggle(cFarming, "Auto Upgrade",    "AutoUpgrade",     4)
-mkToggle(cFarming, "Auto Train",      "AutoTrain",       5)
-mkToggle(cFarming, "Auto Rebirth",    "AutoRebirth",     6)
+mkToggle(cFarming, "Auto Super Loot",  "AutoSuperLoot",   3)
+mkToggle(cFarming, "Auto Upgrade",     "AutoUpgrade",     4)
+mkToggle(cFarming, "Auto Train",       "AutoTrain",       5)
+mkToggle(cFarming, "Auto Rebirth",     "AutoRebirth",     6)
 mkSlider(cFarming, "Clicks/sec", "ClicksPerSecond", 1, 20, 7)
 
-local cForge = mkGridCard(row1, "🔨 Forge", 2)
-mkToggle(cForge, "Auto Forge",      "AutoForge",     1)
-mkToggle(cForge, "Auto Forge Hat",  "AutoForgeHat",  2)
-mkToggle(cForge, "Auto Forge Armor","AutoForgeArmor",3)
-mkToggle(cForge, "Instant Forge",   "InstantForge",  4)
-mkToggle(cForge, "Auto Equip Best", "AutoEquipBest", 5)
-mkToggle(cForge, "Sell Old Gear",   "SellOldGear",   6)
+local cForge = mkGridCard(row1, "Forge", 2)
+mkToggle(cForge, "Auto Forge",       "AutoForge",     1)
+mkToggle(cForge, "Auto Forge Hat",   "AutoForgeHat",  2)
+mkToggle(cForge, "Auto Forge Armor", "AutoForgeArmor",3)
+mkToggle(cForge, "Instant Forge",    "InstantForge",  4)
+mkToggle(cForge, "Auto Equip Best",  "AutoEquipBest", 5)
+mkToggle(cForge, "Sell Old Gear",    "SellOldGear",   6)
 
 -- Row 2: Enchant | Ores
 local row2 = mkGridRow(pageFarm, 2)
-local cEnchant = mkGridCard(row2, "✨ Enchant", 1)
+local cEnchant = mkGridCard(row2, "Enchant", 1)
 mkToggle(cEnchant, "Auto Enchant",     "AutoEnchant",    1)
 mkToggle(cEnchant, "Auto Enchant Hat", "AutoEnchantHat", 2)
 
-local cOres = mkGridCard(row2, "💎 Ores", 2)
+local cOres = mkGridCard(row2, "Ores", 2)
 mkToggle(cOres, "Infinite Ores", "InfiniteOres", 1)
 mkToggle(cOres, "Pick Ores",     "PickOres",     2)
 
 -- Row 3: Race | Extras
 local row3 = mkGridRow(pageFarm, 3)
-local cRace = mkGridCard(row3, "🏁 Race", 1)
+local cRace = mkGridCard(row3, "Race", 1)
 mkToggle(cRace, "Auto Roll Race", "AutoRollRace", 1)
 mkDropdown(cRace, "Roll Until", "RollUntil", {
     "None","Human","Goblin","Skeleton","Yeti",
     "Vampire","Dragonkin","Void Elf","Demon","Angel"
 }, 2)
 
-local cExtras = mkGridCard(row3, "⚙️ Extras", 2)
-mkToggle(cExtras, "Instant Kill",       "InstantKill",  1)
-mkToggle(cExtras, "God Mode",           "GodMode",      2)
-mkToggle(cExtras, "Auto Claim",         "AutoClaim",    3)
-mkToggle(cExtras, "Disable Notif",      "DisableNotif", 4)
+local cExtras = mkGridCard(row3, "Extras", 2)
+mkToggle(cExtras, "Instant Kill",  "InstantKill",  1)
+mkToggle(cExtras, "God Mode",      "GodMode",      2)
+mkToggle(cExtras, "Auto Claim",    "AutoClaim",    3)
+mkToggle(cExtras, "Disable Notif", "DisableNotif", 4)
 
 -- Row 4: Player
 local row4 = mkGridRow(pageFarm, 4)
-local cPlayer = mkGridCard(row4, "🏃 Player", 1)
-mkToggle(cPlayer, "Walk Speed",     "WalkSpeedEnabled",1)
-mkSlider(cPlayer, "Speed",          "WalkSpeed", 16, 250, 2)
-mkToggle(cPlayer, "Fly",            "Fly",             3)
-mkSlider(cPlayer, "Fly Speed",      "FlySpeed", 10, 400, 4)
-mkToggle(cPlayer, "Infinite Jump",  "InfiniteJump",    5)
-mkToggle(cPlayer, "No Clip",        "NoClip",          6)
-mkToggle(cPlayer, "Anti AFK",       "AntiAFK",         7)
+local cPlayer = mkGridCard(row4, "Player", 1)
+mkToggle(cPlayer, "Walk Speed",    "WalkSpeedEnabled",1)
+mkSlider(cPlayer, "Speed",         "WalkSpeed", 16, 250, 2)
+mkToggle(cPlayer, "Fly",           "Fly",             3)
+mkSlider(cPlayer, "Fly Speed",     "FlySpeed", 10, 400, 4)
+mkToggle(cPlayer, "Infinite Jump", "InfiniteJump",    5)
+mkToggle(cPlayer, "No Clip",       "NoClip",          6)
+mkToggle(cPlayer, "Anti AFK",      "AntiAFK",         7)
 
--- ════════════════════════════════════════
---         PAGE: SETTINGS
--- ════════════════════════════════════════
+-- PAGE: SETTINGS
 local settingsLayout = Instance.new("UIListLayout", pageSettings)
 settingsLayout.Padding   = UDim.new(0,8)
 settingsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 do
-    local c = mkCard(pageSettings, "🎨  Appearance", 1)
-    mkSlider(c, "Menu Size %", "WalkSpeed", 80, 150, 1) -- placeholder visual
+    local c = mkCard(pageSettings, "Appearance", 1)
     mkButton(c, "Reset Position", function()
         Main.Position = UDim2.new(0.5,-310,0.5,-185)
-    end, 2)
+    end, 1)
 end
 
 do
-    local c = mkCard(pageSettings, "💾  Config", 2)
+    local c = mkCard(pageSettings, "Config", 2)
     mkButton(c, "Save Config", function()
         notify("PrimoDax Hub","Config saved!")
     end, 1)
@@ -1121,18 +963,15 @@ do
 end
 
 do
-    local c = mkCard(pageSettings, "ℹ️  Info", 3)
+    local c = mkCard(pageSettings, "Info", 3)
     mkInfoRow(c, "Version", function() return "v1.0" end, 1)
     mkInfoRow(c, "Game", function() return game.PlaceId end, 2)
     mkInfoRow(c, "Script", function() return "Loot To Forge" end, 3)
 end
 
--- ════════════════════════════════════════
---         INIT
--- ════════════════════════════════════════
+-- INIT
 switchPage("Home")
 
--- Keybind: RShift / Insert toggle
 UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
     if input.KeyCode == Enum.KeyCode.Insert
@@ -1142,4 +981,4 @@ UserInputService.InputBegan:Connect(function(input, processed)
 end)
 
 notify("PrimoDax Hub", "Loot To Forge loaded! By: BoboyTagaAquarius")
-print("[PrimoDax Hub | Loot To Forge] Loaded — Created By: BoboyTagaAquarius")
+print("[PrimoDax Hub | Loot To Forge] Loaded - Created By: BoboyTagaAquarius")
