@@ -1,7 +1,7 @@
 --[[
-PRIMODAX HUB | UI FEATURE REPLICA
+PRIMODAX HUB | LOOT TO FORGE
+Exact UI Layout Replica (Airflow Style)
 Created By: BoboyTagaAquarius
-Features matched from screenshots (red-circled elements replaced with custom branding).
 ]]
 
 local Players = game:GetService("Players")
@@ -30,13 +30,13 @@ end
 
 local parent = getGui()
 
--- Colors matching the dark/purple theme
-local C_BG = Color3.fromRGB(20, 20, 25)
-local C_SIDEBAR = Color3.fromRGB(28, 28, 34)
-local C_CARD = Color3.fromRGB(35, 35, 42)
-local C_TEXT = Color3.fromRGB(230, 230, 235)
+-- Colors
+local C_BG = Color3.fromRGB(22, 22, 27)
+local C_TOPBAR = Color3.fromRGB(30, 30, 36)
+local C_SECTION = Color3.fromRGB(30, 30, 36)
+local C_TEXT = Color3.fromRGB(240, 240, 245)
 local C_DIM = Color3.fromRGB(150, 150, 160)
-local C_ACCENT = Color3.fromRGB(180, 150, 255) -- Purple accent
+local C_ACCENT = Color3.fromRGB(200, 180, 255)
 
 local Gui = Instance.new("ScreenGui")
 Gui.Name = "PrimoDaxUI"
@@ -45,18 +45,10 @@ Gui.IgnoreGuiInset = true
 Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 Gui.Parent = parent
 
--- Helpers
 local function corner(obj, r)
     local c = Instance.new("UICorner")
     c.CornerRadius = UDim.new(0, r or 6)
     c.Parent = obj
-end
-
-local function stroke(obj, col, thick)
-    local s = Instance.new("UIStroke")
-    s.Color = col or C_CARD
-    s.Thickness = thick or 1
-    s.Parent = obj
 end
 
 local function makeDraggable(frame, handle)
@@ -89,44 +81,57 @@ local FloatIcon = Instance.new("TextButton")
 FloatIcon.Name = "FloatIcon"
 FloatIcon.Size = UDim2.fromOffset(50, 50)
 FloatIcon.Position = UDim2.new(0, 20, 0.4, 0)
-FloatIcon.BackgroundColor3 = C_SIDEBAR
+FloatIcon.BackgroundColor3 = C_BG
 FloatIcon.Text = "P"
 FloatIcon.TextColor3 = C_ACCENT
 FloatIcon.Font = Enum.Font.GothamBold
 FloatIcon.TextSize = 24
 FloatIcon.BorderSizePixel = 0
 FloatIcon.Parent = Gui
-corner(FloatIcon, 10)
-stroke(FloatIcon, C_ACCENT, 1)
+corner(FloatIcon, 8)
 
 -- Main Window
 local Main = Instance.new("Frame")
 Main.Name = "Main"
 Main.AnchorPoint = Vector2.new(0.5, 0.5)
 Main.Position = UDim2.fromScale(0.5, 0.5)
-Main.Size = UDim2.fromOffset(500, 350)
+Main.Size = UDim2.fromOffset(550, 380)
 Main.BackgroundColor3 = C_BG
 Main.BorderSizePixel = 0
 Main.ClipsDescendants = true
 Main.Visible = false
 Main.Parent = Gui
-corner(Main, 10)
-stroke(Main, C_CARD, 1)
+corner(Main, 8)
 
 -- Topbar (Draggable)
 local TopBar = Instance.new("Frame")
 TopBar.Name = "TopBar"
 TopBar.Size = UDim2.new(1, 0, 0, 40)
-TopBar.BackgroundColor3 = C_SIDEBAR
+TopBar.BackgroundColor3 = C_TOPBAR
 TopBar.BorderSizePixel = 0
 TopBar.Parent = Main
 makeDraggable(Main, TopBar)
 
--- TITLE
+-- Tabs Container (Aligned Right like screenshots)
+local TabsContainer = Instance.new("Frame")
+TabsContainer.BackgroundTransparency = 1
+TabsContainer.AnchorPoint = Vector2.new(1, 0)
+TabsContainer.Position = UDim2.new(1, -15, 0, 0)
+TabsContainer.Size = UDim2.new(0.6, 0, 1, 0)
+TabsContainer.Parent = TopBar
+
+local TabLayout = Instance.new("UIListLayout")
+TabLayout.FillDirection = Enum.FillDirection.Horizontal
+TabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+TabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+TabLayout.Padding = UDim.new(0, 15)
+TabLayout.Parent = TabsContainer
+
+-- Left Title (Red circled area replaced)
 local Title = Instance.new("TextLabel")
 Title.BackgroundTransparency = 1
 Title.Position = UDim2.fromOffset(15, 0)
-Title.Size = UDim2.new(0.5, 0, 1, 0)
+Title.Size = UDim2.new(0.3, 0, 1, 0)
 Title.Font = Enum.Font.GothamBold
 Title.Text = "PrimoDax Hub" 
 Title.TextColor3 = C_ACCENT
@@ -134,25 +139,10 @@ Title.TextSize = 14
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TopBar
 
--- Tabs Container
-local TabsContainer = Instance.new("Frame")
-TabsContainer.BackgroundTransparency = 1
-TabsContainer.AnchorPoint = Vector2.new(1, 0)
-TabsContainer.Position = UDim2.new(1, -15, 0, 0)
-TabsContainer.Size = UDim2.new(0.5, 0, 1, 0)
-TabsContainer.Parent = TopBar
-
-local TabLayout = Instance.new("UIListLayout")
-TabLayout.FillDirection = Enum.FillDirection.Horizontal
-TabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
-TabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-TabLayout.Padding = UDim.new(0, 10)
-TabLayout.Parent = TabsContainer
-
 local Pages = {}
 local TabButtons = {}
 
-local function CreateTab(name)
+local function CreateTab(name, icon)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0, 0, 1, 0)
     btn.AutomaticSize = Enum.AutomaticSize.X
@@ -162,11 +152,6 @@ local function CreateTab(name)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 12
     btn.Parent = TabsContainer
-    
-    local pad = Instance.new("UIPadding")
-    pad.PaddingLeft = UDim.new(0, 5)
-    pad.PaddingRight = UDim.new(0, 5)
-    pad.Parent = btn
     
     local page = Instance.new("ScrollingFrame")
     page.Name = name .. "Page"
@@ -181,16 +166,18 @@ local function CreateTab(name)
     page.Visible = false
     page.Parent = Main
     
-    local pad2 = Instance.new("UIPadding")
-    pad2.PaddingTop = UDim.new(0, 10)
-    pad2.PaddingBottom = UDim.new(0, 10)
-    pad2.PaddingLeft = UDim.new(0, 10)
-    pad2.PaddingRight = UDim.new(0, 10)
-    pad2.Parent = page
+    -- Padding
+    local pad = Instance.new("UIPadding")
+    pad.PaddingTop = UDim.new(0, 10)
+    pad.PaddingBottom = UDim.new(0, 10)
+    pad.PaddingLeft = UDim.new(0, 10)
+    pad.PaddingRight = UDim.new(0, 10)
+    pad.Parent = page
     
+    -- 2-Column Grid exactly like screenshots
     local grid = Instance.new("UIGridLayout")
-    grid.CellSize = UDim2.new(0.48, 0, 0, 200)
-    grid.CellPadding = UDim2.new(0.04, 0, 0, 10)
+    grid.CellSize = UDim2.new(0.48, 0, 0, 180) -- Fixed height for sections
+    grid.CellPadding = UDim2.new(0.04, 0, 0, 8)
     grid.SortOrder = Enum.SortOrder.LayoutOrder
     grid.Parent = page
     
@@ -205,13 +192,14 @@ local function CreateTab(name)
     end)
 end
 
+-- Section Builder
 local function CreateSection(parentPage, title, order)
     local frame = Instance.new("Frame")
-    frame.BackgroundColor3 = C_CARD
+    frame.BackgroundColor3 = C_SECTION
     frame.BorderSizePixel = 0
     frame.LayoutOrder = order
     frame.Parent = parentPage
-    corner(frame, 8)
+    corner(frame, 6)
     
     local pad = Instance.new("UIPadding")
     pad.PaddingTop = UDim.new(0, 10)
@@ -244,16 +232,17 @@ local function CreateSection(parentPage, title, order)
     return frame
 end
 
+-- Toggle with working logic
 local function CreateToggle(parent, label, order)
     local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, 0, 0, 24)
+    container.Size = UDim2.new(1, 0, 0, 22)
     container.BackgroundTransparency = 1
     container.LayoutOrder = order
     container.Parent = parent
     
     local text = Instance.new("TextLabel")
     text.BackgroundTransparency = 1
-    text.Size = UDim2.new(1, -40, 1, 0)
+    text.Size = UDim2.new(1, -30, 1, 0)
     text.Font = Enum.Font.Gotham
     text.Text = label
     text.TextColor3 = C_TEXT
@@ -264,25 +253,28 @@ local function CreateToggle(parent, label, order)
     local btn = Instance.new("TextButton")
     btn.AnchorPoint = Vector2.new(1, 0.5)
     btn.Position = UDim2.new(1, 0, 0.5, 0)
-    btn.Size = UDim2.fromOffset(30, 16)
+    btn.Size = UDim2.fromOffset(28, 14)
     btn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
     btn.Text = ""
     btn.AutoButtonColor = false
     btn.Parent = container
-    corner(btn, 8)
+    corner(btn, 7)
     
     local circle = Instance.new("Frame")
-    circle.Size = UDim2.fromOffset(12, 12)
+    circle.Size = UDim2.fromOffset(10, 10)
     circle.Position = UDim2.fromOffset(2, 2)
     circle.BackgroundColor3 = Color3.new(1, 1, 1)
     circle.Parent = btn
-    corner(circle, 6)
+    corner(circle, 5)
     
     local toggled = false
     btn.Activated:Connect(function()
         toggled = not toggled
+        -- ACTUAL FUNCTIONALITY LOGIC HERE (Prints for now as we don't have game remotes)
+        print("[PrimoDax] Toggle:", label, "is now", toggled)
+        
         TweenService:Create(circle, TweenInfo.new(0.1), {
-            Position = toggled and UDim2.new(1, -14, 0, 2) or UDim2.fromOffset(2, 2)
+            Position = toggled and UDim2.new(1, -12, 0, 2) or UDim2.fromOffset(2, 2)
         }):Play()
         TweenService:Create(btn, TweenInfo.new(0.1), {
             BackgroundColor3 = toggled and C_ACCENT or Color3.fromRGB(50, 50, 60)
@@ -292,7 +284,7 @@ end
 
 local function CreateDropdown(parent, label, options, order)
     local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, 0, 0, 24)
+    container.Size = UDim2.new(1, 0, 0, 22)
     container.BackgroundTransparency = 1
     container.LayoutOrder = order
     container.Parent = parent
@@ -310,7 +302,7 @@ local function CreateDropdown(parent, label, options, order)
     local btn = Instance.new("TextButton")
     btn.AnchorPoint = Vector2.new(1, 0.5)
     btn.Position = UDim2.new(1, 0, 0.5, 0)
-    btn.Size = UDim2.fromOffset(50, 20)
+    btn.Size = UDim2.fromOffset(50, 18)
     btn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
     btn.Text = options[1] or "None"
     btn.TextColor3 = C_TEXT
@@ -318,18 +310,27 @@ local function CreateDropdown(parent, label, options, order)
     btn.TextSize = 10
     btn.Parent = container
     corner(btn, 4)
+    
+    -- Simple cycling dropdown logic
+    local idx = 1
+    btn.Activated:Connect(function()
+        idx = idx + 1
+        if idx > #options then idx = 1 end
+        btn.Text = options[idx]
+        print("[PrimoDax] Dropdown", label, "set to", btn.Text)
+    end)
 end
 
 local function CreateTextInput(parent, label, placeholder, order)
     local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, 0, 0, 24)
+    container.Size = UDim2.new(1, 0, 0, 22)
     container.BackgroundTransparency = 1
     container.LayoutOrder = order
     container.Parent = parent
     
     local text = Instance.new("TextLabel")
     text.BackgroundTransparency = 1
-    text.Size = UDim2.new(1, -120, 1, 0)
+    text.Size = UDim2.new(1, -110, 1, 0)
     text.Font = Enum.Font.Gotham
     text.Text = label
     text.TextColor3 = C_TEXT
@@ -340,7 +341,7 @@ local function CreateTextInput(parent, label, placeholder, order)
     local box = Instance.new("TextBox")
     box.AnchorPoint = Vector2.new(1, 0.5)
     box.Position = UDim2.new(1, 0, 0.5, 0)
-    box.Size = UDim2.fromOffset(110, 20)
+    box.Size = UDim2.fromOffset(100, 18)
     box.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
     box.PlaceholderText = placeholder
     box.Text = ""
@@ -357,92 +358,95 @@ CreateTab("Home")
 CreateTab("Farm")
 CreateTab("Settings")
 
--- HOME PAGE FEATURES
+-- ==========================================
+-- HOME PAGE (Features matched to Screenshot 6)
+-- ==========================================
 local homePage = Pages["Home"]
-local userSec = CreateSection(homePage, "USER INFO", 1)
-CreateToggle(userSec, "Free", 1) 
-CreateTextInput(userSec, "Name", "Display Name", 2)
-local serverSec = CreateSection(homePage, "SERVER INFO", 2)
-CreateTextInput(serverSec, "Job ID", "Job ID", 1)
-local actionsSec = CreateSection(homePage, "ACTIONS", 3)
+local homeSec1 = CreateSection(homePage, "User Info", 1)
+CreateTextInput(homeSec1, "Name", "Not logged in", 1)
+CreateToggle(homeSec1, "Lifetime (Free)", 2)
+
+local homeSec2 = CreateSection(homePage, "Game Info", 2)
+CreateTextInput(homeSec2, "Job ID", "...", 1)
+CreateToggle(homeSec2, "Copy Job ID", 2)
+
+local homeSec3 = CreateSection(homePage, "Actions", 3)
 local rejoinBtn = Instance.new("TextButton")
-rejoinBtn.Size = UDim2.new(1, 0, 0, 24)
-rejoinBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+rejoinBtn.Size = UDim2.new(1, 0, 0, 20)
+rejoinBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
 rejoinBtn.Text = "Rejoin Server"
 rejoinBtn.TextColor3 = C_TEXT
 rejoinBtn.Font = Enum.Font.Gotham
-rejoinBtn.TextSize = 11
+rejoinBtn.TextSize = 10
 rejoinBtn.LayoutOrder = 1
-rejoinBtn.Parent = actionsSec
+rejoinBtn.Parent = homeSec3
 corner(rejoinBtn, 4)
 
-local welcomeSec = CreateSection(homePage, "INFO", 4)
-local welcomeLbl = Instance.new("TextLabel")
-welcomeLbl.Size = UDim2.new(1, 0, 0, 30)
-welcomeLbl.BackgroundTransparency = 1
-welcomeLbl.Font = Enum.Font.GothamBold
-welcomeLbl.Text = "Welcome to PrimoDax Hub\nCreated By: BoboyTagaAquarius"
-welcomeLbl.TextColor3 = C_ACCENT
-welcomeLbl.TextSize = 12
-welcomeLbl.TextWrapped = true
-welcomeLbl.LayoutOrder = 1
-welcomeLbl.Parent = welcomeSec
-
--- FARM PAGE FEATURES
+-- ==========================================
+-- FARM PAGE (Features matched to Screenshot 2)
+-- ==========================================
 local farmPage = Pages["Farm"]
-local farmSec = CreateSection(farmPage, "FARMING", 1)
-CreateToggle(farmSec, "Infinite Money", 1)
-CreateToggle(farmSec, "Auto Dungeon Loot", 2)
-CreateToggle(farmSec, "Auto Super Loot", 3)
-CreateToggle(farmSec, "Auto Upgrade", 4)
-CreateToggle(farmSec, "Auto Train", 5)
-CreateToggle(farmSec, "Auto Rebirth", 6)
 
-local forgeSec = CreateSection(farmPage, "FORGE", 2)
-CreateToggle(forgeSec, "Auto Forge", 1)
-CreateToggle(forgeSec, "Auto Forge Hat", 2)
-CreateToggle(forgeSec, "Auto Forge Armor", 3)
-CreateToggle(forgeSec, "Instant Forge", 4)
-CreateToggle(forgeSec, "Auto Equip Best", 5)
-CreateToggle(forgeSec, "Sell Old Gear", 6)
+-- Column 1 equivalent
+local farmSec1 = CreateSection(farmPage, "Farming", 1)
+CreateToggle(farmSec1, "Infinite Money", 1)
+CreateToggle(farmSec1, "Auto Dungeon Loot", 2)
+CreateToggle(farmSec1, "Auto Super Loot", 3)
+CreateToggle(farmSec1, "Auto Upgrade", 4)
+CreateToggle(farmSec1, "Auto Train", 5)
+CreateToggle(farmSec1, "Auto Rebirth", 6)
 
-local enchSec = CreateSection(farmPage, "ENCHANT", 3)
-CreateToggle(enchSec, "Auto Enchant", 1)
-CreateToggle(enchSec, "Auto Enchant Hat", 2)
+local farmSec2 = CreateSection(farmPage, "Enchant", 2)
+CreateToggle(farmSec2, "Auto Enchant", 1)
+CreateToggle(farmSec2, "Auto Enchant Hat", 2)
+CreateToggle(farmSec2, "Auto Enchant Weapon", 3)
 
-local oresSec = CreateSection(farmPage, "ORES", 4)
-CreateToggle(oresSec, "Infinite Ores", 1)
-CreateDropdown(oresSec, "Pick Ores", {"None", "Common", "Rare", "Legendary"}, 2)
+local farmSec3 = CreateSection(farmPage, "Race", 3)
+CreateToggle(farmSec3, "Auto Roll Race", 1)
+CreateDropdown(farmSec3, "Roll Until", {"None", "Human", "Goblin", "Skeleton", "Yeti", "Vampire"}, 2)
 
-local raceSec = CreateSection(farmPage, "RACE", 5)
-CreateToggle(raceSec, "Auto Roll Race", 1)
-CreateDropdown(raceSec, "Roll Until", {"None", "Human", "Goblin", "Skeleton", "Yeti", "Vampire"}, 2)
+-- Column 2 equivalent
+local farmSec4 = CreateSection(farmPage, "Forge", 4)
+CreateToggle(farmSec4, "Auto Forge", 1)
+CreateToggle(farmSec4, "Auto Forge Hat", 2)
+CreateToggle(farmSec4, "Auto Forge Armor", 3)
+CreateToggle(farmSec4, "Instant Forge", 4)
+CreateToggle(farmSec4, "Auto Equip Best", 5)
+CreateToggle(farmSec4, "Sell Old Gear", 6)
 
-local extrasSec = CreateSection(farmPage, "EXTRAS", 6)
-CreateToggle(extrasSec, "Instant Kill", 1)
-CreateToggle(extrasSec, "God Mode", 2)
-CreateToggle(extrasSec, "Auto Claim", 3)
-CreateToggle(extrasSec, "Disable Notifications", 4)
+local farmSec5 = CreateSection(farmPage, "Ores", 5)
+CreateToggle(farmSec5, "Infinite Ores", 1)
+CreateDropdown(farmSec5, "Pick Ores", {"None", "Common", "Rare", "Legendary"}, 2)
 
--- SETTINGS PAGE FEATURES
+local farmSec6 = CreateSection(farmPage, "Extras", 6)
+CreateToggle(farmSec6, "Instant Kill", 1)
+CreateToggle(farmSec6, "God Mode", 2)
+CreateToggle(farmSec6, "Auto Claim", 3)
+CreateToggle(farmSec6, "Disable Notifications", 4)
+
+-- ==========================================
+-- SETTINGS PAGE (Features matched to Screenshot 1)
+-- ==========================================
 local setPage = Pages["Settings"]
-local menuSetSec = CreateSection(setPage, "MENU", 1)
-CreateTextInput(menuSetSec, "Menu Keybind", "RSHIFT", 1)
-CreateDropdown(menuSetSec, "Menu Size", {"100%", "90%", "80%", "70%"}, 2)
 
-local themeSec = CreateSection(setPage, "THEME", 2)
-CreateDropdown(themeSec, "Preset", {"Airflow", "Dark", "Light"}, 1)
-CreateToggle(themeSec, "Smoke", 2)
-CreateToggle(themeSec, "Muted Text", 3)
-CreateToggle(themeSec, "Text Outline", 4)
+local setSec1 = CreateSection(setPage, "Menu", 1)
+CreateTextInput(setSec1, "Menu Keybind", "RSHIFT", 1)
+CreateDropdown(setSec1, "Menu Size", {"100%", "90%", "80%"}, 2)
+CreateTextInput(setSec1, "Menu Color", "#FFFFFF", 3)
 
-local configSec = CreateSection(setPage, "CONFIGS", 3)
-CreateTextInput(configSec, "Config Name", "no configs", 1)
+local setSec2 = CreateSection(setPage, "Themes", 2)
+CreateDropdown(setSec2, "Preset", {"Airflow", "Dark", "Light"}, 1)
+CreateTextInput(setSec2, "Theme Name", "None", 2)
+
+local setSec3 = CreateSection(setPage, "Configs", 3)
+CreateTextInput(setSec3, "Config Name", "no configs", 1)
+CreateDropdown(setSec3, "AutoLoad", {"None", "Default", "Custom"}, 2)
+
 local cBtnFrame = Instance.new("Frame")
-cBtnFrame.Size = UDim2.new(1, 0, 0, 24)
+cBtnFrame.Size = UDim2.new(1, 0, 0, 20)
 cBtnFrame.BackgroundTransparency = 1
-cBtnFrame.LayoutOrder = 2
-cBtnFrame.Parent = configSec
+cBtnFrame.LayoutOrder = 3
+cBtnFrame.Parent = setSec3
 local cBtnLayout = Instance.new("UIListLayout")
 cBtnLayout.FillDirection = Enum.FillDirection.Horizontal
 cBtnLayout.Padding = UDim.new(0, 5)
@@ -458,6 +462,7 @@ local function makeSmallBtn(text, p)
     b.TextSize = 10
     b.Parent = p
     corner(b, 4)
+    b.Activated:Connect(function() print("[PrimoDax] Config Action:", text) end)
 end
 makeSmallBtn("Create", cBtnFrame)
 makeSmallBtn("Save", cBtnFrame)
@@ -472,5 +477,13 @@ local function ToggleMenu()
     Main.Visible = not Main.Visible
 end
 FloatIcon.Activated:Connect(ToggleMenu)
+
+-- Keybind Toggle (RightShift / Insert)
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.RightShift or input.KeyCode == Enum.KeyCode.Insert then
+        ToggleMenu()
+    end
+end)
 
 print("[PrimoDax Hub] UI Replica Loaded — Created By: BoboyTagaAquarius. Join our discord server: https://discord.gg/wqAReaB3d")
